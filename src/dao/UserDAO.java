@@ -35,19 +35,22 @@ public Users findById(int id) {
 }
 
     // MÉTODO: ATUALIZAR (Update) - Novo!
-    public void update(Users u) {
-    String sql = "UPDATE users SET nmuser=?, document=?, nrcellphone=?, dtbirth=?, cdaddress=?, cdoccupation=? WHERE cduser=?";
+public void update(Users u) {
+    String sql = "UPDATE users SET nmuser=?, document=?, fgdocument=?, nrcellphone=?, dtbirth=?, cdaddress=?, cdoccupation=? WHERE cduser=?";
     try (Connection conn = Conexao.getConexao();
          PreparedStatement ps = conn.prepareStatement(sql)) {
         ps.setString(1, u.getNmuser());
         ps.setString(2, u.getDocument());
-        ps.setString(3, u.getNrcellphone());
-        ps.setDate(4, java.sql.Date.valueOf(u.getDtbirth()));
-        ps.setInt(5, u.getCdaddress());
-        ps.setInt(6, u.getCdoccupation());
-        ps.setInt(7, u.getCduser());
+        ps.setInt(3, u.getFgdocument());
+        ps.setString(4, u.getNrcellphone());
+        ps.setDate(5, java.sql.Date.valueOf(u.getDtbirth()));
+        ps.setInt(6, u.getCdaddress());
+        ps.setInt(7, u.getCdoccupation());
+        ps.setInt(8, u.getCduser());
         ps.executeUpdate();
-    } catch (SQLException e) { e.printStackTrace(); }
+    } catch (SQLException e) {
+        e.printStackTrace();
+    }
 }
 
 // Método para verificar se o usuário tem "rabos presos" no sistema

@@ -3,7 +3,7 @@ package view;
 import dao.*;
 import model.*;
 import java.time.LocalDate;
-//import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
@@ -103,29 +103,136 @@ public class Main {
         userDAO.saveUser(u, null);
     }
 
-    private static void consultarUsuario() {
-        System.out.print("ID do Usuário: ");
-        Users u = userDAO.findById(Integer.parseInt(sc.nextLine()));
-        if (u != null) System.out.println("Nome: " + u.getNmuser() + " | Doc: " + u.getDocument());
-        else System.out.println("Não encontrado.");
-    }
+private static void consultarUsuario() {
+        boolean encontrou = false;
+        while (!encontrou) {
+            System.out.print("\nID do Usuário para consulta detalhada: ");
+            String input = sc.nextLine();
+            if (input.isEmpty()) break;
+            
+            int id = Integer.parseInt(input);
+            Users u = userDAO.findById(id); 
 
-    private static void atualizarUsuario() {
-        System.out.print("ID para atualizar: ");
-        Users u = userDAO.findById(Integer.parseInt(sc.nextLine()));
-        if (u != null) {
-            System.out.print("Novo Nome (" + u.getNmuser() + "): ");
-            String n = sc.nextLine(); if(!n.isEmpty()) u.setNmuser(n);
-            userDAO.update(u);
+            if (u != null) {
+                System.out.println("\n========================================");
+                System.out.println("           DADOS DO USUÁRIO             ");
+                System.out.println("========================================");
+                System.out.println("ID:            " + u.getCduser());
+                System.out.println("Nome:          " + u.getNmuser());
+                System.out.println("Documento:     " + u.getDocument() + " (Tipo: " + u.getFgdocument() + ")");
+                System.out.println("Celular:       " + u.getNrcellphone());
+                System.out.println("Nascimento:    " + u.getDtbirth().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+                System.out.println("ID Endereço:   " + u.getCdaddress());
+                System.out.println("ID Profissão:  " + u.getCdoccupation());
+                System.out.println("========================================");
+                encontrou = true;
+            } else {
+                System.out.print("ERRO: Usuário não encontrado. Listar todos? (s/n): ");
+                if (sc.nextLine().equalsIgnoreCase("s")) {
+                    userDAO.getAllUsersList().forEach(System.out::println);
+                } else break;
+            }
         }
     }
 
-    private static void excluirUsuario() {
-        System.out.print("ID para EXCLUIR: ");
-        int id = Integer.parseInt(sc.nextLine());
-        String motivo = userDAO.verificarVinculos(id);
-        if (motivo != null) System.out.println("IMPOSSÍVEL EXCLUIR! Motivo: " + motivo);
-        else { userDAO.delete(id); System.out.println("Removido!"); }
+private static void atualizarUsuario() {
+        boolean encontrou = false;
+        while (!encontrou) {
+            System.out.print("\nID do usuário para atualizar: ");
+            String input = sc.nextLine();
+            if (input.isEmpty()) return;
+            
+            int id = Integer.parseInt(input);
+            Users u = userDAO.findById(id);
+
+            if (u != null) {
+                System.out.println("Pressione ENTER para manter o valor atual.");
+                
+                System.out.print("Nome (" + u.getNmuser() + "): ");
+                String nome = sc.nextLine();
+                if (!nome.isEmpty()) u.setNmuser(nome);
+
+                System.out.print("Documento (" + u.getDocument() + "): ");
+                String doc = sc.nextLine();
+                if (!doc.isEmpty()) u.setDocument(doc);
+
+                System.out.print("Tipo Documento (" + u.getFgdocument() + "): ");
+                String fg = sc.nextLine();
+                if (!fg.isEmpty()) u.setFgdocument(Integer.parseInt(fg));
+
+                System.out.print("Celular (" + u.getNrcellphone() + "): ");
+                String cel = sc.nextLine();
+                if (!cel.isEmpty()) u.setNrcellphone(cel);
+
+                System.out.print("Data Nasc (" + u.getDtbirth() + "): ");
+                String data = sc.nextLine();
+                if (!data.isEmpty()) u.setDtbirth(LocalDate.parse(data));
+
+                System.out.print("ID Endereço (" + u.getCdaddress() + "): ");
+                String end = sc.nextLine();
+                if (!end.isEmpty()) u.setCdaddress(Integer.parseInt(end));
+
+                System.out.print("ID Profissão (" + u.getCdoccupation() + "): ");
+                String prof = sc.nextLine();
+                if (!prof.isEmpty()) u.setCdoccupation(Integer.parseInt(prof));
+
+                userDAO.update(u);
+                System.out.println("Usuário atualizado com sucesso!");
+                encontrou = true;
+            } else {
+                System.out.print("ID não encontrado. Ver lista? (s/n): ");
+                if (sc.nextLine().equalsIgnoreCase("s")) {
+                    userDAO.getAllUsersList().forEach(System.out::println);
+                } else break;
+            }
+        }
+    }
+
+private static void excluirUsuario() {
+        boolean saiu = false;
+        while (!saiu) {
+            System.out.print("\nID do usuário para EXCLUIR: ");
+            String input = sc.nextLine();
+            if (input.isEmpty()) return;
+            
+            int id = Integer.parseInt(input);
+            Users u = userDAO.findById(id);
+
+            if (u == null) {
+                System.out.println("ERRO: O ID " + id + " não existe no sistema.");
+                System.out.print("Deseja ver a lista de usuários aptos para exclusão? (s/n): ");
+                if (sc.nextLine().equalsIgnoreCase("s")) {
+                    mostrarUsuariosExcluiveis();
+                } else return;
+                continue;
+            }
+
+            String motivo = userDAO.verificarVinculos(id);
+            if (motivo != null) {
+                System.out.println("\nIMPOSSÍVEL EXCLUIR! Motivo: " + motivo);
+                System.out.print("Deseja ver os usuários que NÃO possuem vínculos e podem ser excluídos? (s/n): ");
+                if (sc.nextLine().equalsIgnoreCase("s")) {
+                    mostrarUsuariosExcluiveis();
+                } else return;
+            } else {
+                System.out.print("Confirmar exclusão definitiva do usuário '" + u.getNmuser() + "'? (s/n): ");
+                if (sc.nextLine().equalsIgnoreCase("s")) {
+                    userDAO.delete(id);
+                    System.out.println("Usuário removido com sucesso!");
+                    saiu = true;
+                } else return;
+            }
+        }
+    }
+
+    private static void mostrarUsuariosExcluiveis() {
+        List<String> aptos = userDAO.getDeletableUsers();
+        if (aptos.isEmpty()) {
+            System.out.println("Aviso: Todos os usuários cadastrados possuem vínculos ativos.");
+        } else {
+            System.out.println("\n--- USUÁRIOS SEM VÍNCULOS (APTOS PARA EXCLUSÃO) ---");
+            aptos.forEach(System.out::println);
+        }
     }
 
     private static void cadastrarImovel() {
