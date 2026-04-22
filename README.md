@@ -1,5 +1,5 @@
 # Compilar
-javac -encoding UTF-8 -d bin -cp "dist/lib/*" src/model/*.java src/dao/*.java src/view/*.java
+javac -encoding UTF-8 -d bin -cp "dist/lib/*" src/model/*.java src/dao/*.java src/view/*.java src/dto/*.java src/service/*.java
 # Rodar
 java -cp "bin;dist/lib/*" view.Main
 

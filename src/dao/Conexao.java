@@ -11,9 +11,9 @@ import java.sql.SQLException;
 public class Conexao {
 
     // 1. Dados da conexão são constantes e privados
-    private static final String URL = "jdbc:postgresql://localhost:5432/imobiliaria3";
+    private static final String URL = "jdbc:postgresql://localhost:5432/imobiliaria5";
     private static final String USER = "postgres";
-    private static final String SENHA = "postgres";
+    private static final String SENHA = "@Suzano26";
 
     // 2. Construtor privado para impedir que alguém crie um `new Conexao()`
     private Conexao() {}
