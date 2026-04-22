@@ -14,7 +14,7 @@ public class IndexRateDAO {
      * Insere uma nova taxa de índice no banco de dados.
      */
     public void insertRate(Index_Rates rate) {
-        String sql = "INSERT INTO Index_Rates (refmonth, refyear, vlrate, cdindex) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO Index_Rates (refmonth, refyear, vlrate, fk_Indexes_cdindex) VALUES (?, ?, ?, ?)";
 
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -22,7 +22,7 @@ public class IndexRateDAO {
             ps.setInt(1, rate.getRefmonth());
             ps.setInt(2, rate.getRefyear());
             ps.setDouble(3, rate.getVlrate());
-            ps.setInt(4, rate.getCdindex());
+            ps.setInt(4, rate.getFk_Indexes_cdindex());
 
             ps.executeUpdate();
             System.out.println("Index Rate inserted successfully!");
@@ -50,7 +50,7 @@ public class IndexRateDAO {
                 rate.setRefmonth(rs.getInt("refmonth"));
                 rate.setRefyear(rs.getInt("refyear"));
                 rate.setVlrate(rs.getDouble("vlrate"));
-                rate.setCdindex(rs.getInt("cdindex"));
+                rate.setFk_Indexes_cdindex(rs.getInt("fk_Indexes_cdindex"));
                 list.add(rate);
             }
 
@@ -65,7 +65,7 @@ public class IndexRateDAO {
      * Útil para calcular o reajuste de contratos (Installments).
      */
     public Index_Rates findLatestById(int cdindex) {
-        String sql = "SELECT * FROM Index_Rates WHERE cdindex = ? ORDER BY refyear DESC, refmonth DESC LIMIT 1";
+        String sql = "SELECT * FROM Index_Rates WHERE fk_Indexes_cdindex = ? ORDER BY refyear DESC, refmonth DESC LIMIT 1";
         
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -78,7 +78,7 @@ public class IndexRateDAO {
                     rate.setRefmonth(rs.getInt("refmonth"));
                     rate.setRefyear(rs.getInt("refyear"));
                     rate.setVlrate(rs.getDouble("vlrate"));
-                    rate.setCdindex(rs.getInt("cdindex"));
+                    rate.setFk_Indexes_cdindex(rs.getInt("fk_Indexes_cdindex"));
                     return rate;
                 }
             }

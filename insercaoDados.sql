@@ -88,8 +88,8 @@ INSERT INTO Commissions (cdcommission, vlcommission, dtpayment, cdcontract, cdus
 (1, 1500.00, '2026-04-21', 1, 3);
 
 -- 19. Notificações (Notifications)
-INSERT INTO Notifications (cdnotification, dsmessage, dtsend, fgread, cdcontract, cduser) VALUES 
-(1, 'Seu contrato de locação foi gerado com sucesso!', '2026-04-20', false, 1, 1);
+INSERT INTO Notifications (cdnotification, dsmessage, dtsend, fgstatus, tpnotification, cdcontract, cduser) VALUES 
+(1, 'Seu contrato de locação foi gerado com sucesso!', '2026-04-20', 2, 1, 1, 1);
 
 -- 20. Taxas de Índices (Index_Rates)
 -- Taxa de exemplo para o IPCA em Abril/2026

@@ -10,7 +10,8 @@ public class Installments {
     private int cdstatus;         // status da parcela (ex: Pago, Pendente)
     private LocalDate dtpayment;  // data em que foi paga
     private int nrinstallment;    // número da parcela (ex: 1, 2, 3...)
-    private int cdcontract;       // Foreign Key para Contracts
+    private int fk_Contracts_cdcontract; // Foreign Key para Contracts
+    private LocalDate dtlastadjustment; // data da última correção
 
     // Getters e Setters
 
@@ -56,10 +57,16 @@ public class Installments {
     public void setNrinstallment(int nrinstallment) {
         this.nrinstallment = nrinstallment;
     }
-    public int getCdcontract() {
-        return cdcontract;
+    public int getFk_Contracts_cdcontract() {
+        return fk_Contracts_cdcontract;
     }
-    public void setCdcontract(int cdcontract) {
-        this.cdcontract = cdcontract;
+    public void setFk_Contracts_cdcontract(int fk_Contracts_cdcontract) {
+        this.fk_Contracts_cdcontract = fk_Contracts_cdcontract;
+    }
+    public LocalDate getDtlastadjustment() {
+        return dtlastadjustment;
+    }
+    public void setDtlastadjustment(LocalDate dtlastadjustment) {
+        this.dtlastadjustment = dtlastadjustment;
     }
 }

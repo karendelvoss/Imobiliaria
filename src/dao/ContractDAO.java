@@ -37,12 +37,14 @@ public class ContractDAO {
             }
 
             // 2. Vincula os Participantes (Locatário, Proprietário, etc.)
-            String sqlParticipants = "INSERT INTO User_Contract_Contracts_Users_Roles (cdcontract, cduser, cdrole) VALUES (?, ?, ?)";
+            String sqlParticipants = "INSERT INTO User_Contract_Contracts_Users_Roles (cdcontract, cduser, cdrole, vlparticipation, fgsignaturestatus) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement stmtP = conn.prepareStatement(sqlParticipants)) {
                 for (User_Contract part : participants) {
                     stmtP.setInt(1, generatedContractId);
                     stmtP.setInt(2, part.getCduser());
                     stmtP.setInt(3, part.getCdrole());
+                    stmtP.setDouble(4, part.getVlparticipation());
+                    stmtP.setInt(5, part.getFgsignaturestatus());
                     stmtP.addBatch();
                 }
                 stmtP.executeBatch();
@@ -123,6 +125,60 @@ public class ContractDAO {
             System.err.println("Erro ao listar contratos: " + e.getMessage());
         }
         return list;
+    }
+
+    public Contracts findById(int contractId) {
+        String sql = "SELECT * FROM Contracts WHERE cdcontract = ?";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            
+            ps.setInt(1, contractId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Contracts c = new Contracts();
+                    c.setCdcontract(rs.getInt("cdcontract"));
+                    c.setDtcreation(rs.getDate("dtcreation").toLocalDate());
+                    c.setDstitle(rs.getString("dstitle"));
+                    c.setCdtemplate(rs.getInt("cdtemplate"));
+                    c.setCdproperty(rs.getInt("cdproperty"));
+                    c.setCdindex(rs.getInt("cdindex"));
+                    return c;
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao buscar contrato por ID: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Busca todos os contratos que possuem um índice de reajuste definido.
+     * @return Uma lista de objetos Contracts.
+     */
+    public List<Contracts> findAllWithAdjustmentIndex() {
+        List<Contracts> contracts = new ArrayList<>();
+        String sql = "SELECT * FROM Contracts WHERE cdindex IS NOT NULL";
+        
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            
+            while (rs.next()) {
+                Contracts c = new Contracts();
+                c.setCdcontract(rs.getInt("cdcontract"));
+                c.setDtcreation(rs.getDate("dtcreation").toLocalDate());
+                c.setDstitle(rs.getString("dstitle"));
+                c.setCdtemplate(rs.getInt("cdtemplate"));
+                c.setCdproperty(rs.getInt("cdproperty"));
+                c.setCdindex(rs.getInt("cdindex"));
+                contracts.add(c);
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao buscar contratos com índice de reajuste: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return contracts;
     }
 
     /**

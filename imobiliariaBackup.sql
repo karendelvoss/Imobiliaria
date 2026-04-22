@@ -170,6 +170,7 @@ CREATE TABLE Installments (
     cdstatus int,
     dtpayment date,
     nrinstallment int,
+    dtlastadjustment date,
     fk_Contracts_cdcontract int
 );
 
@@ -177,7 +178,8 @@ CREATE TABLE Notifications (
     cdnotification int PRIMARY KEY,
     dsmessage text,
     dtsend date,
-    fgread boolean,
+    fgstatus int,
+    tpnotification int,
     cdcontract int,
     cduser int
 );

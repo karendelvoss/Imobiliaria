@@ -5,10 +5,10 @@ public class Index_Rates {
     private int refmonth;   // mês de referência
     private int refyear;    // ano de referência
     private double vlrate;  // decimal - valor da taxa
-    private int cdindex;    // Foreign Key para Indexes
+    private int fk_Indexes_cdindex;    // Foreign Key para Indexes
 
     // Getters e Setters
-    
+
     public int getCdrate() {
         return cdrate;
     }
@@ -33,11 +33,11 @@ public class Index_Rates {
     public void setVlrate(double vlrate) {
         this.vlrate = vlrate;
     }
-    public int getCdindex() {
-        return cdindex;
+    public int getFk_Indexes_cdindex() {
+        return fk_Indexes_cdindex;
     }
-    public void setCdindex(int cdindex) {
-        this.cdindex = cdindex;
+    public void setFk_Indexes_cdindex(int fk_Indexes_cdindex) {
+        this.fk_Indexes_cdindex = fk_Indexes_cdindex;
     }
 
 }
