@@ -83,5 +83,5 @@ VALUES (1, 150.00, '2026-05-05', 1);
 INSERT INTO Installments (cdinstallment, dtdue, vlbase, vladjusted, cdstatus, dtpayment, nrinstallment, cdcontract) 
 VALUES (1, '2026-05-10', 1500.00, 1500.00, 1, NULL, 1, 1);
 
-INSERT INTO Notifications (cdnotification, dsmessage, dtsend, fgstatus, tpnotification, cdcontract, cduser) 
-VALUES (1, 'Seu contrato foi gerado com sucesso.', '2026-04-22', 0, 1, 1, 1);
+INSERT INTO Notifications (cdnotification, dsmessage, dtsend, fgread, cdcontract, cduser) 
+VALUES (1, 'Seu contrato foi gerado com sucesso.', '2026-04-22', FALSE, 1, 1);

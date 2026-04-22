@@ -1,4 +1,4 @@
-/* L�gico_2: */
+/* Lógico_2: */
 
 CREATE TABLE Users (
     cduser int PRIMARY KEY,
@@ -175,8 +175,7 @@ CREATE TABLE Notifications (
     cdnotification int PRIMARY KEY,
     dsmessage text,
     dtsend date,
-    fgstatus int,
-    tpnotification int,
+    fgread boolean,
     cdcontract int,
     cduser int
 );
