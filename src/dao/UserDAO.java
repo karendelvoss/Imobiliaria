@@ -100,30 +100,35 @@ public String verificarVinculos(int id) {
             conn = Conexao.getConexao();
             conn.setAutoCommit(false); 
 
-            String sqlUser = "INSERT INTO Users (dtbirth, fgdocument, document, nmuser, nrcellphone, cdaddress, cdoccupation) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            String sqlMax = "SELECT COALESCE(MAX(cduser), 0) + 1 AS prox_id FROM Users";
+            String sqlUser = "INSERT INTO Users (cduser, dtbirth, fgdocument, document, nmuser, nrcellphone, cdaddress, cdoccupation) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             int generatedUserId = 0;
 
-            try (PreparedStatement stmtU = conn.prepareStatement(sqlUser, Statement.RETURN_GENERATED_KEYS)) {
+            try (Statement st = conn.createStatement();
+                 ResultSet rsMax = st.executeQuery(sqlMax)) {
+                if (rsMax.next()) {
+                    generatedUserId = rsMax.getInt("prox_id");
+                }
+            }
+
+            try (PreparedStatement stmtU = conn.prepareStatement(sqlUser)) {
+                stmtU.setInt(1, generatedUserId);
+
                 // Tratamento de segurança para datas nulas
                 if (user.getDtbirth() != null) {
-                    stmtU.setDate(1, Date.valueOf(user.getDtbirth()));
+                    stmtU.setDate(2, Date.valueOf(user.getDtbirth()));
                 } else {
-                    stmtU.setNull(1, Types.DATE);
+                    stmtU.setNull(2, Types.DATE);
                 }
                 
-                stmtU.setInt(2, user.getFgdocument());
-                stmtU.setString(3, user.getDocument());
-                stmtU.setString(4, user.getNmuser());
-                stmtU.setString(5, user.getNrcellphone());
-                stmtU.setInt(6, user.getCdaddress());
-                stmtU.setInt(7, user.getCdoccupation());
+                stmtU.setInt(3, user.getFgdocument());
+                stmtU.setString(4, user.getDocument());
+                stmtU.setString(5, user.getNmuser());
+                stmtU.setString(6, user.getNrcellphone());
+                stmtU.setInt(7, user.getCdaddress());
+                stmtU.setInt(8, user.getCdoccupation());
                 
                 stmtU.executeUpdate();
-
-                ResultSet rs = stmtU.getGeneratedKeys();
-                if (rs.next()) {
-                    generatedUserId = rs.getInt(1);
-                }
             }
 
             if (broker != null && generatedUserId > 0) {
