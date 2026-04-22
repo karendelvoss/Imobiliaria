@@ -2,12 +2,12 @@
 -- PostgreSQL database dump
 --
 
-\restrict lmTdKCoIh5szaJGiUUetwbseDnazE0UqOHblgdWuYrMp3HW09eT1lrcI1npTNku
+\restrict GhYUiOu6YPKOiqtldjzzw5PtfyFxgrJlEZPoe5LgEoIoekUyMlTktkBdjABIzqm
 
 -- Dumped from database version 18.3
 -- Dumped by pg_dump version 18.3
 
--- Started on 2026-04-22 01:56:53
+-- Started on 2026-04-22 03:10:34
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -552,7 +552,7 @@ COPY public.districts (cddistrict, nmdistrict, cdcity) FROM stdin;
 --
 
 COPY public.index_rates (cdrate, refmonth, refyear, vlrate, fk_indexes_cdindex) FROM stdin;
-1	4	2026	0.0045	1
+1	5	2026	0.0045	2
 \.
 
 
@@ -1272,11 +1272,11 @@ ALTER TABLE ONLY public.properties_users
     ADD CONSTRAINT fkproperties_users_2 FOREIGN KEY (cduser) REFERENCES public.users(cduser);
 
 
--- Completed on 2026-04-22 01:56:54
+-- Completed on 2026-04-22 03:10:35
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict lmTdKCoIh5szaJGiUUetwbseDnazE0UqOHblgdWuYrMp3HW09eT1lrcI1npTNku
+\unrestrict GhYUiOu6YPKOiqtldjzzw5PtfyFxgrJlEZPoe5LgEoIoekUyMlTktkBdjABIzqm
 
