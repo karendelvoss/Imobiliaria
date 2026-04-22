@@ -7,11 +7,21 @@ import java.util.List;
 
 public class IndexDAO {
     public void insert(Indexes idx) {
-        String sql = "INSERT INTO Indexes (nmindex) VALUES (?)";
+        int proxId = 1;
+        String sqlMax = "SELECT COALESCE(MAX(cdindex), 0) + 1 AS prox_id FROM Indexes";
+        try (Connection conn = Conexao.getConexao();
+             Statement st = conn.createStatement();
+             ResultSet rsMax = st.executeQuery(sqlMax)) {
+            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
+        } catch (SQLException e) { e.printStackTrace(); }
+
+        String sql = "INSERT INTO Indexes (cdindex, nmindex) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, idx.getNmindex());
+            ps.setInt(1, proxId);
+            ps.setString(2, idx.getNmindex());
             ps.executeUpdate();
+            System.out.println("Índice inserido com sucesso! (ID: " + proxId + ")");
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -66,14 +76,16 @@ public class IndexDAO {
         }
     }
 
-    public void delete(int id) {
+    public boolean delete(int id) {
         String sql = "DELETE FROM Indexes WHERE cdindex = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            ps.executeUpdate();
+            int rows = ps.executeUpdate();
+            return rows > 0;
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("Erro ao excluir índice: " + e.getMessage());
+            return false;
         }
     }
 }

@@ -36,7 +36,7 @@ public class ContractDAO {
             }
 
             // 2. Vincula os Participantes (Locatário, Proprietário, etc.)
-            String sqlParticipants = "INSERT INTO User_Contract (cdcontract, cduser, cdrole) VALUES (?, ?, ?)";
+            String sqlParticipants = "INSERT INTO User_Contract_Contracts_Users_Roles (cdcontract, cduser, cdrole) VALUES (?, ?, ?)";
             try (PreparedStatement stmtP = conn.prepareStatement(sqlParticipants)) {
                 for (User_Contract part : participants) {
                     stmtP.setInt(1, generatedContractId);
@@ -155,5 +155,20 @@ public class ContractDAO {
         System.err.println("Erro ao gerar relatório: " + e.getMessage());
         return false;
     }
+    }
+
+    /**
+     * Verifica rapidamente se um contrato existe no banco de dados.
+     */
+    public boolean contractExists(int idContract) {
+        String sql = "SELECT 1 FROM Contracts WHERE cdcontract = ?";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idContract);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return false;
     }
 }

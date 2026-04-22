@@ -49,7 +49,15 @@ public void update(Users u) {
         ps.setInt(8, u.getCduser());
         ps.executeUpdate();
     } catch (SQLException e) {
-        e.printStackTrace();
+        if (e.getMessage().contains("cdaddress") || e.getMessage().contains("addresses")) {
+            System.err.println("ERRO: O ID de Endereço (" + u.getCdaddress() + ") informado não existe no sistema.");
+        } else if (e.getMessage().contains("cdoccupation") || e.getMessage().contains("occupations")) {
+            System.err.println("ERRO: O ID de Profissão (" + u.getCdoccupation() + ") informado não existe no sistema.");
+        } else if (e.getMessage().contains("document") || e.getMessage().contains("users_document_key")) {
+            System.err.println("ERRO: Já existe um usuário cadastrado com este documento.");
+        } else {
+            System.err.println("Erro ao atualizar usuário: " + e.getMessage());
+        }
     }
 }
 
@@ -64,18 +72,35 @@ public String verificarVinculos(int id) {
             if (rs.next() && rs.getInt(1) > 0) return "PROPRIETÁRIO VINCULADO A IMÓVEL";
         }
         // Verifica se tem contrato (como locatário/comprador)
-        String sqlCont = "SELECT COUNT(*) FROM user_contract WHERE cduser = ?";
+        String sqlCont = "SELECT COUNT(*) FROM user_contract_contracts_users_roles WHERE cduser = ?";
         try (PreparedStatement ps = conn.prepareStatement(sqlCont)) {
             ps.setInt(1, id);
             ResultSet rs = ps.executeQuery();
             if (rs.next() && rs.getInt(1) > 0) return "CLIENTE COM CONTRATO ATIVO";
         }
-    } catch (SQLException e) { e.printStackTrace(); }
+        // Verifica se possui vínculos como corretor
+        String sqlBroker = "SELECT COUNT(*) FROM broker_data WHERE cduser = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sqlBroker)) {
+            ps.setInt(1, id);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next() && rs.getInt(1) > 0) return "CORRETOR COM DADOS VINCULADOS";
+        }
+        // Verifica se possui conta bancária
+        String sqlBank = "SELECT COUNT(*) FROM bank_accounts WHERE cduser = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sqlBank)) {
+            ps.setInt(1, id);
+            ResultSet rs = ps.executeQuery();
+            if (rs.next() && rs.getInt(1) > 0) return "CONTA BANCÁRIA VINCULADA";
+        }
+    } catch (SQLException e) { 
+        e.printStackTrace(); 
+        return "ERRO AO VERIFICAR VÍNCULOS"; 
+    }
     return null; // Sem vínculos
 }
 
     // MÉTODO: EXCLUIR (Delete)
-    public void delete(int id) {
+    public boolean delete(int id) {
         String sql = "DELETE FROM Users WHERE cduser = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -83,13 +108,15 @@ public String verificarVinculos(int id) {
             ps.setInt(1, id);
             int rows = ps.executeUpdate();
             if (rows > 0) {
-                System.out.println("Usuário removido com sucesso!");
+                return true;
             } else {
                 System.out.println("Nenhum usuário encontrado com esse ID.");
+                return false;
             }
         } catch (SQLException e) {
             // Se houver contratos ou imóveis ligados ao usuário, o banco vai dar erro de FK aqui
             System.err.println("Erro ao excluir (verifique se há vínculos): " + e.getMessage());
+            return false;
         }
     }
 
@@ -147,7 +174,15 @@ public String verificarVinculos(int id) {
             if (conn != null) {
                 try { conn.rollback(); } catch (SQLException ex) { ex.printStackTrace(); }
             }
-            e.printStackTrace();
+            if (e.getMessage().contains("cdaddress") || e.getMessage().contains("addresses")) {
+                System.err.println("ERRO: O ID de Endereço (" + user.getCdaddress() + ") informado não existe no banco de dados.");
+            } else if (e.getMessage().contains("cdoccupation") || e.getMessage().contains("occupations")) {
+                System.err.println("ERRO: O ID de Profissão (" + user.getCdoccupation() + ") informado não existe no banco de dados.");
+            } else if (e.getMessage().contains("document") || e.getMessage().contains("users_document_key")) {
+                System.err.println("ERRO: Já existe um usuário cadastrado com este documento.");
+            } else {
+                System.err.println("Erro ao salvar usuário: " + e.getMessage());
+            }
         } finally {
             if (conn != null) {
                 try { conn.close(); } catch (SQLException e) { e.printStackTrace(); }
@@ -173,7 +208,9 @@ public List<String> getDeletableUsers() {
     // Busca usuários que NÃO estão em properties_users E NÃO estão em user_contract
     String sql = "SELECT cduser, nmuser FROM users " +
                  "WHERE cduser NOT IN (SELECT cduser FROM properties_users) " +
-                 "AND cduser NOT IN (SELECT cduser FROM user_contract) " +
+                 "AND cduser NOT IN (SELECT cduser FROM user_contract_contracts_users_roles) " +
+                 "AND cduser NOT IN (SELECT cduser FROM broker_data) " +
+                 "AND cduser NOT IN (SELECT cduser FROM bank_accounts) " +
                  "ORDER BY cduser";
     try (Connection conn = Conexao.getConexao();
          PreparedStatement stmt = conn.prepareStatement(sql);

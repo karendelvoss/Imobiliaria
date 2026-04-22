@@ -7,13 +7,22 @@ import java.util.List;
 
 public class ClauseDAO {
     public void insert(Clauses c) {
-        String sql = "INSERT INTO Clauses (dstext, cdtopic) VALUES (?, ?)";
+        int proxId = 1;
+        String sqlMax = "SELECT COALESCE(MAX(cdclause), 0) + 1 AS prox_id FROM Clauses";
+        try (Connection conn = Conexao.getConexao();
+             Statement st = conn.createStatement();
+             ResultSet rsMax = st.executeQuery(sqlMax)) {
+            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
+        } catch (SQLException e) { e.printStackTrace(); }
+
+        String sql = "INSERT INTO Clauses (cdclause, dstext, cdtopic) VALUES (?, ?, ?)";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, c.getDstext());
-            ps.setInt(2, c.getCdtopic());
+            ps.setInt(1, proxId);
+            ps.setString(2, c.getDstext());
+            ps.setInt(3, c.getCdtopic());
             ps.executeUpdate();
-            System.out.println("Cláusula inserida com sucesso!");
+            System.out.println("Cláusula inserida com sucesso! (ID: " + proxId + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir cláusula: " + e.getMessage());
         }
@@ -71,14 +80,16 @@ public class ClauseDAO {
         }
     }
 
-    public void delete(int id) {
+    public boolean delete(int id) {
         String sql = "DELETE FROM Clauses WHERE cdclause = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            ps.executeUpdate();
+            int rows = ps.executeUpdate();
+            return rows > 0;
         } catch (SQLException e) {
             System.err.println("Erro ao excluir cláusula: " + e.getMessage());
+            return false;
         }
     }
 }

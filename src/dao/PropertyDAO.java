@@ -9,26 +9,59 @@ public class PropertyDAO {
 
     // 1. Insert a new Property into the database
     public void insertProperty(Properties prop) {
-        String sql = "INSERT INTO Properties (nrregistration, dsdescription, vltotalarea, cdaddress, cdtype, cdpurpose, cdstatus) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        int proxId = 1;
+        String sqlMax = "SELECT COALESCE(MAX(cdproperty), 0) + 1 AS prox_id FROM Properties";
+        
+        try (Connection conn = Conexao.getConexao();
+             Statement st = conn.createStatement();
+             ResultSet rsMax = st.executeQuery(sqlMax)) {
+            if (rsMax.next()) {
+                proxId = rsMax.getInt("prox_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        String sql = "INSERT INTO Properties (cdproperty, nrregistration, dsdescription, vltotalarea, cdaddress, cdtype, cdpurpose, cdstatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             
-            ps.setString(1, prop.getNrregistration());
-            ps.setString(2, prop.getDsdescription());
-            ps.setDouble(3, prop.getVltotalarea());
-            ps.setInt(4, prop.getCdaddress());
-            ps.setInt(5, prop.getCdtype());
-            ps.setInt(6, prop.getCdpurpose());
-            ps.setInt(7, prop.getCdstatus());
+            ps.setInt(1, proxId);
+            ps.setString(2, prop.getNrregistration());
+            ps.setString(3, prop.getDsdescription());
+            ps.setDouble(4, prop.getVltotalarea());
+            ps.setInt(5, prop.getCdaddress());
+            ps.setInt(6, prop.getCdtype());
+            ps.setInt(7, prop.getCdpurpose());
+            ps.setInt(8, prop.getCdstatus());
             
             ps.executeUpdate();
-            System.out.println("Property inserted successfully!");
+            System.out.println("Imóvel cadastrado com sucesso! (ID: " + proxId + ")");
             
         } catch (SQLException e) {
-            e.printStackTrace();
+            if (e.getMessage().contains("vltotalarea")) {
+                String sql2 = "INSERT INTO Properties (cdproperty, nrregistration, dsdescription, vltotalarea_, cdaddress, cdtype, cdpurpose, cdstatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+                try (Connection conn2 = Conexao.getConexao();
+                     PreparedStatement ps2 = conn2.prepareStatement(sql2)) {
+                    ps2.setInt(1, proxId);
+                    ps2.setString(2, prop.getNrregistration());
+                    ps2.setString(3, prop.getDsdescription());
+                    ps2.setDouble(4, prop.getVltotalarea());
+                    ps2.setInt(5, prop.getCdaddress());
+                    ps2.setInt(6, prop.getCdtype());
+                    ps2.setInt(7, prop.getCdpurpose());
+                    ps2.setInt(8, prop.getCdstatus());
+                    ps2.executeUpdate();
+                    System.out.println("Imóvel cadastrado com sucesso! (ID: " + proxId + ")");
+                } catch (SQLException ex2) { ex2.printStackTrace(); }
+            } else {
+                e.printStackTrace();
+            }
         }
     }
+
+                
 
     // 2. Link an Owner (User) to a Property (N:N relationship)
     public void linkOwner(int idProperty, int idUser) {
@@ -62,7 +95,10 @@ public class PropertyDAO {
                 p.setCdproperty(rs.getInt("cdproperty"));
                 p.setNrregistration(rs.getString("nrregistration"));
                 p.setDsdescription(rs.getString("dsdescription"));
-                p.setVltotalarea(rs.getDouble("vltotalarea"));
+                try { p.setVltotalarea(rs.getDouble("vltotalarea")); } 
+                catch (SQLException ex) { 
+                    try { p.setVltotalarea(rs.getDouble("vltotalarea_")); } catch (SQLException ex2) {} 
+                }
                 p.setCdaddress(rs.getInt("cdaddress"));
                 p.setCdtype(rs.getInt("cdtype"));
                 p.setCdpurpose(rs.getInt("cdpurpose"));
@@ -115,8 +151,26 @@ public class PropertyDAO {
         System.out.println("Imóvel atualizado com sucesso no banco de dados!");
         
     } catch (SQLException e) {
-        System.err.println("Erro ao atualizar imóvel: " + e.getMessage());
-        e.printStackTrace();
+        if (e.getMessage().contains("vltotalarea")) {
+            String sql2 = "UPDATE Properties SET nrregistration = ?, dsdescription = ?, " +
+                          "vltotalarea_ = ?, cdaddress = ?, cdtype = ?, cdpurpose = ?, " +
+                          "cdstatus = ? WHERE cdproperty = ?";
+            try (Connection conn2 = Conexao.getConexao();
+                 PreparedStatement ps2 = conn2.prepareStatement(sql2)) {
+                ps2.setString(1, prop.getNrregistration());
+                ps2.setString(2, prop.getDsdescription());
+                ps2.setDouble(3, prop.getVltotalarea());
+                ps2.setInt(4, prop.getCdaddress());
+                ps2.setInt(5, prop.getCdtype());
+                ps2.setInt(6, prop.getCdpurpose());
+                ps2.setInt(7, prop.getCdstatus());
+                ps2.setInt(8, prop.getCdproperty());
+                ps2.executeUpdate();
+                System.out.println("Imóvel atualizado com sucesso no banco de dados!");
+            } catch (SQLException ex2) { System.err.println("Erro ao atualizar imóvel: " + ex2.getMessage()); }
+        } else {
+            System.err.println("Erro ao atualizar imóvel: " + e.getMessage());
+        }
     }
 }
 
@@ -178,7 +232,6 @@ public List<String> getAvailableProperties() {
 
 // Método para buscar um imóvel específico pelo ID (Necessário para a validação no Main)
 public Properties findById(int id) {
-    Properties p = null;
     String sql = "SELECT * FROM Properties WHERE cdproperty = ?";
 
     try (Connection conn = Conexao.getConexao();
@@ -187,21 +240,25 @@ public Properties findById(int id) {
         ps.setInt(1, id);
         try (ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
-                p = new Properties();
+                Properties p = new Properties();
                 p.setCdproperty(rs.getInt("cdproperty"));
                 p.setNrregistration(rs.getString("nrregistration"));
                 p.setDsdescription(rs.getString("dsdescription"));
-                p.setVltotalarea(rs.getDouble("vltotalarea"));
+                try { p.setVltotalarea(rs.getDouble("vltotalarea")); } 
+                catch (SQLException ex) { 
+                    try { p.setVltotalarea(rs.getDouble("vltotalarea_")); } catch (SQLException ex2) {} 
+                }
                 p.setCdaddress(rs.getInt("cdaddress"));
                 p.setCdtype(rs.getInt("cdtype"));
                 p.setCdpurpose(rs.getInt("cdpurpose"));
                 p.setCdstatus(rs.getInt("cdstatus"));
+                return p;
             }
         }
     } catch (SQLException e) {
         System.err.println("Erro ao buscar imóvel por ID: " + e.getMessage());
     }
-    return p;
+    return null;
 }
 
 public int countOwners(int idProperty) {
@@ -304,6 +361,10 @@ public String findByIdDetalhado(int id) {
         if (rs.next()) {
             String endereco = rs.getString("nmstreet") + ", nº " + rs.getString("nraddress");
             
+            double area = 0.0;
+            try { area = rs.getDouble("vltotalarea"); } 
+            catch (SQLException ex) { try { area = rs.getDouble("vltotalarea_"); } catch (SQLException ex2) {} }
+
             return String.format(
                 "\n--- DETALHES DO IMÓVEL ---\n" +
                 "ID: %d | Matrícula: %s\n" +
@@ -313,7 +374,7 @@ public String findByIdDetalhado(int id) {
                 "Endereço: %s",
                 rs.getInt("cdproperty"), rs.getString("nrregistration"),
                 rs.getString("dsdescription"), rs.getString("nmtype"),
-                rs.getString("nmpurpose"), rs.getDouble("vltotalarea"),
+                rs.getString("nmpurpose"), area,
                 rs.getString("nmstatus"), endereco
             );
         }

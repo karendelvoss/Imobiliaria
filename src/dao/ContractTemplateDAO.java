@@ -7,14 +7,28 @@ import java.util.List;
 
 public class ContractTemplateDAO {
     public void insert(Contract_Templates ct) {
-        String sql = "INSERT INTO Contract_Templates (nmtemplate, dsversion, fgactive) VALUES (?, ?, ?)";
+        int proxId = 1;
+        String sqlMax = "SELECT COALESCE(MAX(cdtemplate), 0) + 1 AS prox_id FROM Contract_Templates";
+        
+        try (Connection conn = Conexao.getConexao();
+             Statement st = conn.createStatement();
+             ResultSet rsMax = st.executeQuery(sqlMax)) {
+            if (rsMax.next()) {
+                proxId = rsMax.getInt("prox_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        String sql = "INSERT INTO Contract_Templates (cdtemplate, nmtemplate, dsversion, fgactive) VALUES (?, ?, ?, ?)";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, ct.getNmtemplate());
-            ps.setString(2, ct.getDsversion());
-            ps.setString(3, ct.getFgactive());
+            ps.setInt(1, proxId);
+            ps.setString(2, ct.getNmtemplate());
+            ps.setString(3, ct.getDsversion());
+            ps.setString(4, ct.getFgactive());
             ps.executeUpdate();
-            System.out.println("Modelo de contrato inserido com sucesso!");
+            System.out.println("Modelo de contrato inserido com sucesso! (ID: " + proxId + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir modelo de contrato: " + e.getMessage());
         }
@@ -75,14 +89,16 @@ public class ContractTemplateDAO {
         }
     }
 
-    public void delete(int id) {
+    public boolean delete(int id) {
         String sql = "DELETE FROM Contract_Templates WHERE cdtemplate = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            ps.executeUpdate();
+            int rows = ps.executeUpdate();
+            return rows > 0;
         } catch (SQLException e) {
-            System.err.println("Erro ao excluir modelo de contrato: " + e.getMessage());
+            System.err.println("Erro ao excluir (verifique se o modelo está sendo usado por cláusulas/tópicos): " + e.getMessage());
+            return false;
         }
     }
 }

@@ -75,14 +75,16 @@ public class RoleDAO {
         }
     }
 
-    public void delete(int id) {
+    public boolean delete(int id) {
         String sql = "DELETE FROM Roles WHERE cdrole = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            ps.executeUpdate();
+            int rows = ps.executeUpdate();
+            return rows > 0;
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("Erro ao excluir papel: " + e.getMessage());
+            return false;
         }
     }
 }

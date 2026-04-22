@@ -7,12 +7,26 @@ import java.util.List;
 
 public class PropertyPurposeDAO {
     public void insert(Property_Purposes pp) {
-        String sql = "INSERT INTO Property_Purposes (nmpurpose) VALUES (?)";
+        int proxId = 1;
+        String sqlMax = "SELECT COALESCE(MAX(cdpurpose), 0) + 1 AS prox_id FROM Property_Purposes";
+        
+        try (Connection conn = Conexao.getConexao();
+             Statement st = conn.createStatement();
+             ResultSet rsMax = st.executeQuery(sqlMax)) {
+            if (rsMax.next()) {
+                proxId = rsMax.getInt("prox_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        String sql = "INSERT INTO Property_Purposes (cdpurpose, nmpurpose) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, pp.getNmpurpose());
+            ps.setInt(1, proxId);
+            ps.setString(2, pp.getNmpurpose());
             ps.executeUpdate();
-            System.out.println("Finalidade de imóvel inserida com sucesso!");
+            System.out.println("Finalidade de imóvel inserida com sucesso! (ID: " + proxId + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir finalidade: " + e.getMessage());
         }
@@ -67,14 +81,16 @@ public class PropertyPurposeDAO {
         }
     }
 
-    public void delete(int id) {
+    public boolean delete(int id) {
         String sql = "DELETE FROM Property_Purposes WHERE cdpurpose = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            ps.executeUpdate();
+            int rows = ps.executeUpdate();
+            return rows > 0;
         } catch (SQLException e) {
             System.err.println("Erro ao excluir finalidade: " + e.getMessage());
+            return false;
         }
     }
 }

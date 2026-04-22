@@ -7,12 +7,26 @@ import java.util.List;
 
 public class PropertyTypeDAO {
     public void insert(Property_Types pt) {
-        String sql = "INSERT INTO Property_Types (nmtype) VALUES (?)";
+        int proxId = 1;
+        String sqlMax = "SELECT COALESCE(MAX(cdtype), 0) + 1 AS prox_id FROM Property_Types";
+        
+        try (Connection conn = Conexao.getConexao();
+             Statement st = conn.createStatement();
+             ResultSet rsMax = st.executeQuery(sqlMax)) {
+            if (rsMax.next()) {
+                proxId = rsMax.getInt("prox_id");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        String sql = "INSERT INTO Property_Types (cdtype, nmtype) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, pt.getNmtype());
+            ps.setInt(1, proxId);
+            ps.setString(2, pt.getNmtype());
             ps.executeUpdate();
-            System.out.println("Tipo de imóvel inserido com sucesso!");
+            System.out.println("Tipo de imóvel inserido com sucesso! (ID: " + proxId + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir tipo de imóvel: " + e.getMessage());
         }
@@ -67,14 +81,16 @@ public class PropertyTypeDAO {
         }
     }
 
-    public void delete(int id) {
+    public boolean delete(int id) {
         String sql = "DELETE FROM Property_Types WHERE cdtype = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            ps.executeUpdate();
+            int rows = ps.executeUpdate();
+            return rows > 0;
         } catch (SQLException e) {
             System.err.println("Erro ao excluir tipo de imóvel: " + e.getMessage());
+            return false;
         }
     }
 }
