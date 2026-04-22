@@ -1,4 +1,4 @@
-/* Lógico_2: */
+/* Lï¿½gico_2: */
 
 CREATE TABLE Users (
     cduser int PRIMARY KEY,

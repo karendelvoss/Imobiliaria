@@ -40,19 +40,19 @@ public class PropertyView {
         p.setDsdescription(ler("Descrição: "));
         p.setVltotalarea(lerDouble("Área Total (m²): "));
 
-        int idAddress = lerIdValido("ID Endereço (0 para cancelar)", id -> checkExists("Addresses", "cdaddress", id), this::listAddresses);
+        int idAddress = lerIdValido("ID Endereço", id -> checkExists("Addresses", "cdaddress", id) ? id : null, this::listAddresses);
         if (idAddress == -1) { System.out.println("Cadastro cancelado."); return; }
         p.setCdaddress(idAddress);
 
-        int idType = lerIdValido("ID Tipo (0 para cancelar)", id -> checkExists("Property_Types", "cdtype", id), this::listPropertyTypes);
+        int idType = lerIdValido("ID Tipo", id -> checkExists("Property_Types", "cdtype", id) ? id : null, this::listPropertyTypes);
         if (idType == -1) { System.out.println("Cadastro cancelado."); return; }
         p.setCdtype(idType);
 
-        int idPurpose = lerIdValido("ID Finalidade (0 para cancelar)", id -> checkExists("Property_Purposes", "cdpurpose", id), this::listPropertyPurposes);
+        int idPurpose = lerIdValido("ID Finalidade", id -> checkExists("Property_Purposes", "cdpurpose", id) ? id : null, this::listPropertyPurposes);
         if (idPurpose == -1) { System.out.println("Cadastro cancelado."); return; }
         p.setCdpurpose(idPurpose);
 
-        int idStatus = lerIdValido("ID Status (0 para cancelar)", id -> checkExists("Property_Status", "cdstatus", id), this::listPropertyStatus);
+        int idStatus = lerIdValido("ID Status", id -> checkExists("Property_Status", "cdstatus", id) ? id : null, this::listPropertyStatus);
         if (idStatus == -1) { System.out.println("Cadastro cancelado."); return; }
         p.setCdstatus(idStatus);
 
@@ -81,10 +81,10 @@ public class PropertyView {
         p.setNrregistration(lerOuManter("Matrícula", p.getNrregistration()));
         p.setDsdescription(lerOuManter("Descrição", p.getDsdescription()));
         
-        p.setCdaddress(lerIdOuManter("ID Endereço", p.getCdaddress(), idAddr -> checkExists("Addresses", "cdaddress", idAddr), this::listAddresses));
-        p.setCdtype(lerIdOuManter("ID Tipo", p.getCdtype(), idType -> checkExists("Property_Types", "cdtype", idType), this::listPropertyTypes));
-        p.setCdpurpose(lerIdOuManter("ID Finalidade", p.getCdpurpose(), idPurp -> checkExists("Property_Purposes", "cdpurpose", idPurp), this::listPropertyPurposes));
-        p.setCdstatus(lerIdOuManter("ID Status", p.getCdstatus(), idStat -> checkExists("Property_Status", "cdstatus", idStat), this::listPropertyStatus));
+        p.setCdaddress(lerIdOuManter("ID Endereço", p.getCdaddress(), idAddr -> checkExists("Addresses", "cdaddress", idAddr) ? idAddr : null, this::listAddresses));
+        p.setCdtype(lerIdOuManter("ID Tipo", p.getCdtype(), idType -> checkExists("Property_Types", "cdtype", idType) ? idType : null, this::listPropertyTypes));
+        p.setCdpurpose(lerIdOuManter("ID Finalidade", p.getCdpurpose(), idPurp -> checkExists("Property_Purposes", "cdpurpose", idPurp) ? idPurp : null, this::listPropertyPurposes));
+        p.setCdstatus(lerIdOuManter("ID Status", p.getCdstatus(), idStat -> checkExists("Property_Status", "cdstatus", idStat) ? idStat : null, this::listPropertyStatus));
 
         propertyDAO.updateProperty(p);
         System.out.println("Imóvel atualizado com sucesso!");

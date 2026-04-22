@@ -1,10 +1,12 @@
 package view;
 
+import dao.UserDAO;
 import dao.BankAccountDAO;
 import dao.CityDAO;
 import dao.ClauseDAO;
 import dao.ContractTemplateDAO;
 import dao.CountryDAO;
+import dao.ContractDAO;
 import dao.TopicDAO;
 import dao.VariableDAO;
 import dao.CommissionDAO;
@@ -68,6 +70,8 @@ public class DomainCrudView {
     private final StateDAO stateDAO;
     private final AddressDAO addressDAO;
     private final IndexRateDAO indexRateDAO;
+    private final UserDAO userDAO;
+    private final ContractDAO contractDAO;
 
     public DomainCrudView(CountryDAO countryDAO, CityDAO cityDAO, DistrictDAO districtDAO,
                           PropertyTypeDAO propertyTypeDAO, PropertyPurposeDAO propertyPurposeDAO,
@@ -75,8 +79,8 @@ public class DomainCrudView {
                           ClauseDAO clauseDAO, IndexDAO indexDAO, RoleDAO roleDAO,
                           BankAccountDAO bankAccountDAO, NotificationDAO notificationDAO,
                           TopicDAO topicDAO, VariableDAO variableDAO, 
-                          CommissionDAO commissionDAO, BrokerDataDAO brokerDataDAO,
-                          StateDAO stateDAO, AddressDAO addressDAO, IndexRateDAO indexRateDAO) {
+                          CommissionDAO commissionDAO, BrokerDataDAO brokerDataDAO, StateDAO stateDAO, 
+                          AddressDAO addressDAO, IndexRateDAO indexRateDAO, UserDAO userDAO, ContractDAO contractDAO) {
         this.countryDAO = countryDAO;
         this.cityDAO = cityDAO;
         this.districtDAO = districtDAO;
@@ -96,6 +100,8 @@ public class DomainCrudView {
         this.stateDAO = stateDAO;
         this.addressDAO = addressDAO;
         this.indexRateDAO = indexRateDAO;
+        this.userDAO = userDAO;
+        this.contractDAO = contractDAO;
     }
 
     // --- Submenus ---
@@ -342,14 +348,17 @@ public class DomainCrudView {
                     b.setNragency(ler("Agência: "));
                     b.setNraccount(ler("Conta: "));
                     b.setNrpixkey(ler("PIX: "));
-                    b.setCduser(lerInt("ID Usuário: "));
+                    int idUser = lerIdValido("ID Usuário", userDAO::findById, () -> userDAO.getAllUsersList().forEach(System.out::println));
+                    if (idUser == -1) return null; // Cancela a criação
+                    b.setCduser(idUser);
                     return b;
                 },
                 b -> {
                     b.setNragency(lerOuManter("Agência", b.getNragency()));
                     b.setNraccount(lerOuManter("Conta", b.getNraccount()));
                     b.setNrpixkey(lerOuManter("PIX", b.getNrpixkey()));
-                    b.setCduser(lerIntOuManter("ID Usuário", b.getCduser()));
+                    // Geralmente não se muda o dono de uma conta, mas a validação está aqui por consistência
+                    b.setCduser(lerIdOuManter("ID Usuário", b.getCduser(), userDAO::findById, () -> userDAO.getAllUsersList().forEach(System.out::println)));
                 },
                 bankAccountDAO::findById,
                 b -> b.getCdbankaccount() + " - Ag: " + b.getNragency() + " Cc: " + b.getNraccount()
@@ -363,20 +372,25 @@ public class DomainCrudView {
                     Notifications n = new Notifications();
                     n.setDsmessage(ler("Mensagem: "));
                     n.setDtsend(LocalDate.parse(ler("Data (AAAA-MM-DD): ")));
-                    n.setCdcontract(lerInt("ID Contrato: "));
-                    n.setCduser(lerInt("ID Usuário: "));
-                    n.setFgstatus(lerInt("Status (int): "));
-                    n.setTpnotification(lerInt("Tipo (int): "));
+                    int idContrato = lerIdValido("ID Contrato (0 para cancelar)", contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println));
+                    if (idContrato <= 0) return null;
+                    n.setCdcontract(idContrato);
+                    int idUser = lerIdValido("ID Usuário (0 para cancelar)", userDAO::findById, () -> userDAO.getAllUsersList().forEach(System.out::println));
+                    if (idUser <= 0) return null;
+                    n.setCduser(idUser);
+                    n.setFgread(confirmar("Foi lida? (s/n): "));
                     return n;
                 },
                 n -> {
                     n.setDsmessage(lerOuManter("Mensagem", n.getDsmessage()));
                     String d = ler("Data (" + n.getDtsend() + "): ");
                     if (!d.isEmpty()) n.setDtsend(LocalDate.parse(d));
-                    n.setFgstatus(lerIntOuManter("Status", n.getFgstatus()));
+                    n.setCdcontract(lerIdOuManter("ID Contrato", n.getCdcontract(), contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println)));
+                    n.setCduser(lerIdOuManter("ID Usuário", n.getCduser(), userDAO::findById, () -> userDAO.getAllUsersList().forEach(System.out::println)));
+                    n.setFgread(confirmar("Marcar como lida? (s/n): "));
                 },
                 notificationDAO::findById,
-                n -> n.getCdnotification() + " - " + n.getDtsend() + " | Status: " + n.getFgstatus() + " | Msg: " + n.getDsmessage(),
+                n -> n.getCdnotification() + " - " + n.getDtsend() + " | Lida: " + (n.isFgread() ? "Sim" : "Não") + " | Msg: " + n.getDsmessage(),
                 CrudConsole.adapt(notificationDAO::insert, notificationDAO::update, notificationDAO::delete, notificationDAO::listAll));
     }
 
@@ -397,7 +411,9 @@ public class DomainCrudView {
                     v.setVlvariable(ler("Valor: "));
                     v.setTpvariable(lerInt("Tipo (1=Texto, 2=Moeda, 3=Data): "));
                     v.setFgtriggeralert(confirmar("Gera Alerta? (s/n): "));
-                    v.setCdcontract(lerInt("ID Contrato: "));
+                    int idContrato = lerIdValido("ID Contrato (0 para cancelar)", contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println));
+                    if (idContrato <= 0) return null;
+                    v.setCdcontract(idContrato);
                     return v;
                 },
                 v -> {
@@ -405,7 +421,7 @@ public class DomainCrudView {
                     v.setVlvariable(lerOuManter("Valor", v.getVlvariable()));
                     v.setTpvariable(lerIntOuManter("Tipo", v.getTpvariable()));
                     v.setFgtriggeralert(confirmar("Gera Alerta? (s/n): "));
-                    v.setCdcontract(lerIntOuManter("ID Contrato", v.getCdcontract()));
+                    v.setCdcontract(lerIdOuManter("ID Contrato", v.getCdcontract(), contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println)));
                 },
                 variableDAO::findById,
                 v -> v.getCdvariable() + " - " + v.getNmvariable() + ": " + v.getVlvariable(),
@@ -419,7 +435,9 @@ public class DomainCrudView {
                     c.setVlcommission(lerDouble("Valor (0.0): "));
                     String d = ler("Data Pagamento (AAAA-MM-DD) ou deixe vazio: ");
                     if (!d.isEmpty()) c.setDtpayment(LocalDate.parse(d));
-                    c.setCdcontract(lerInt("ID Contrato: "));
+                    int idContrato = lerIdValido("ID Contrato (0 para cancelar)", contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println));
+                    if (idContrato <= 0) return null;
+                    c.setCdcontract(idContrato);
                     return c;
                 },
                 c -> {
@@ -428,7 +446,7 @@ public class DomainCrudView {
                     } catch (Exception e) { /* mantem */ }
                     String d = ler("Data Pagamento (" + c.getDtpayment() + "): ");
                     if (!d.isEmpty()) c.setDtpayment(LocalDate.parse(d));
-                    c.setCdcontract(lerIntOuManter("ID Contrato", c.getCdcontract()));
+                    c.setCdcontract(lerIdOuManter("ID Contrato", c.getCdcontract(), contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println)));
                 },
                 commissionDAO::findById,
                 c -> c.getCdcommission() + " - R$" + c.getVlcommission() + " (Contrato: " + c.getCdcontract() + ")",

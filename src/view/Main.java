@@ -49,7 +49,7 @@ public class Main {
                 templateDAO, new ClauseDAO(), indexDAO, new RoleDAO(),
                 new BankAccountDAO(), new NotificationDAO(),
                 topicDAO, variableDAO, commissionDAO, brokerDataDAO,
-                stateDAO, addressDAO, indexRateDAO);
+                stateDAO, addressDAO, indexRateDAO, userDAO, contractDAO);
 
         Main app = new Main(
                 new UserView(userDAO),

@@ -67,13 +67,19 @@ public class ContractView {
                 () -> propertyDAO.getAvailableOnly().forEach(System.out::println));
         if (idP == -1) return;
 
+        List<Integer> donos = propertyDAO.getOwnerIdsByProperty(idP);
+        if (donos.isEmpty()) {
+            System.out.println("ERRO: Este imóvel não possui nenhum proprietário vinculado.");
+            System.out.println("Use a opção '2. VINCULAR PROPRIETÁRIO A IMÓVEL' antes de efetivar um contrato.");
+            return;
+        }
+
         int idU = lerIdValido("ID Cliente (Locatário/Comprador)",
                 userDAO::findById,
                 () -> userDAO.getAllUsersList().forEach(System.out::println));
         if (idU == -1) return;
 
         // --- VALIDAÇÃO DE REGRA DE NEGÓCIO: PROPRIETÁRIO VS LOCATÁRIO ---
-        List<Integer> donos = propertyDAO.getOwnerIdsByProperty(idP);
         if (donos.contains(idU)) {
             if (donos.size() == 1) {
                 System.out.println("ERRO: O cliente selecionado é o ÚNICO proprietário deste imóvel.");
@@ -220,6 +226,16 @@ public class ContractView {
         Contracts c = contractDAO.findById(idC);
         System.out.println("Pressione ENTER para manter o valor atual.");
         c.setDstitle(lerOuManter("Título", c.getDstitle()));
+        
+        while (true) {
+            String data = ler("Data Criação (" + c.getDtcreation() + "): ");
+            if (data.isEmpty()) break;
+            try {
+                c.setDtcreation(LocalDate.parse(data.replace("/", "-")));
+                break;
+            } catch (Exception e) { System.out.println("ERRO: Data inválida! Use AAAA-MM-DD."); }
+        }
+        
         c.setCdtemplate(lerIdOuManter("ID Modelo", c.getCdtemplate(),
                 templateDAO::findById,
                 () -> templateDAO.listAll().forEach(

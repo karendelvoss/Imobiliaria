@@ -266,13 +266,14 @@ public class ContractDAO {
     }
 
     public void updateContract(Contracts c) {
-        String sql = "UPDATE Contracts SET dstitle=?, cdtemplate=?, cdindex=? WHERE cdcontract=?";
+        String sql = "UPDATE Contracts SET dstitle=?, cdtemplate=?, cdindex=?, dtcreation=? WHERE cdcontract=?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, c.getDstitle());
             ps.setInt(2, c.getCdtemplate());
             ps.setInt(3, c.getCdindex());
-            ps.setInt(4, c.getCdcontract());
+            ps.setDate(4, Date.valueOf(c.getDtcreation()));
+            ps.setInt(5, c.getCdcontract());
             ps.executeUpdate();
             System.out.println("Contrato atualizado com sucesso!");
         } catch (SQLException e) {
