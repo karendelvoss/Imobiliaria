@@ -50,7 +50,7 @@ CREATE TABLE Roles (
     nmrole varchar(50)
 );
 
-CREATE TABLE User_Contract__Contracts_Users_Roles (
+CREATE TABLE User_Contract_Contracts_Users_Roles (
     cdcontract int,
     cduser int,
     cdrole int
@@ -182,7 +182,7 @@ CREATE TABLE Notifications (
     cduser int
 );
 
-CREATE TABLE _Properties_Users (
+CREATE TABLE Properties_Users (
     cdproperty int,
     cduser int
 );
@@ -217,15 +217,15 @@ ALTER TABLE Districts ADD CONSTRAINT FK_Districts_2
     REFERENCES Cities (cdcity)
     ON DELETE RESTRICT;
 
-ALTER TABLE User_Contract__Contracts_Users_Roles ADD CONSTRAINT FK_User_Contract__Contracts_Users_Roles_1
+ALTER TABLE User_Contract_Contracts_Users_Roles ADD CONSTRAINT FK_User_Contract_Contracts_Users_Roles_1
     FOREIGN KEY (cdcontract)
     REFERENCES Contracts (cdcontract);
 
-ALTER TABLE User_Contract__Contracts_Users_Roles ADD CONSTRAINT FK_User_Contract__Contracts_Users_Roles_2
+ALTER TABLE User_Contract_Contracts_Users_Roles ADD CONSTRAINT FK_User_Contract_Contracts_Users_Roles_2
     FOREIGN KEY (cduser)
     REFERENCES Users (cduser);
 
-ALTER TABLE User_Contract__Contracts_Users_Roles ADD CONSTRAINT FK_User_Contract__Contracts_Users_Roles_3
+ALTER TABLE User_Contract_Contracts_Users_Roles ADD CONSTRAINT FK_User_Contract_Contracts_Users_Roles_3
     FOREIGN KEY (cdrole)
     REFERENCES Roles (cdrole);
 
@@ -322,10 +322,10 @@ ALTER TABLE Notifications ADD CONSTRAINT FK_Notifications_3
     REFERENCES Users (cduser)
     ON DELETE RESTRICT;
 
-ALTER TABLE _Properties_Users ADD CONSTRAINT FK__Properties_Users_1
+ALTER TABLE properties_users ADD CONSTRAINT FKproperties_users_1
     FOREIGN KEY (cdproperty)
     REFERENCES Properties (cdproperty);
 
-ALTER TABLE _Properties_Users ADD CONSTRAINT FK__Properties_Users_2
+ALTER TABLE properties_users ADD CONSTRAINT FKproperties_users_2
     FOREIGN KEY (cduser)
     REFERENCES Users (cduser);
