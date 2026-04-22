@@ -17,22 +17,23 @@ public class ContractDAO {
             conn = Conexao.getConexao();
             conn.setAutoCommit(false); // Inicia a transação (ACID)
 
-            // 1. Salva o Contrato principal e recupera o ID gerado
-            String sqlContract = "INSERT INTO Contracts (dtcreation, dstitle, cdtemplate, cdproperty, cdindex) VALUES (?, ?, ?, ?, ?)";
             int generatedContractId = 0;
+            String sqlMax = "SELECT COALESCE(MAX(cdcontract), 0) + 1 AS prox_id FROM Contracts";
+            try (Statement st = conn.createStatement();
+                 ResultSet rsMax = st.executeQuery(sqlMax)) {
+                if (rsMax.next()) generatedContractId = rsMax.getInt("prox_id");
+            }
 
-            try (PreparedStatement stmtC = conn.prepareStatement(sqlContract, Statement.RETURN_GENERATED_KEYS)) {
-                stmtC.setDate(1, Date.valueOf(contract.getDtcreation()));
-                stmtC.setString(2, contract.getDstitle());
-                stmtC.setInt(3, contract.getCdtemplate() > 0 ? contract.getCdtemplate() : 1);
-                stmtC.setInt(4, contract.getCdproperty());
-                stmtC.setInt(5, contract.getCdindex());
+            // 1. Salva o Contrato principal e recupera o ID gerado
+            String sqlContract = "INSERT INTO Contracts (cdcontract, dtcreation, dstitle, cdtemplate, cdproperty, cdindex) VALUES (?, ?, ?, ?, ?, ?)";
+            try (PreparedStatement stmtC = conn.prepareStatement(sqlContract)) {
+                stmtC.setInt(1, generatedContractId);
+                stmtC.setDate(2, Date.valueOf(contract.getDtcreation()));
+                stmtC.setString(3, contract.getDstitle());
+                stmtC.setInt(4, contract.getCdtemplate() > 0 ? contract.getCdtemplate() : 1);
+                stmtC.setInt(5, contract.getCdproperty());
+                stmtC.setInt(6, contract.getCdindex());
                 stmtC.executeUpdate();
-
-                ResultSet rs = stmtC.getGeneratedKeys();
-                if (rs.next()) {
-                    generatedContractId = rs.getInt(1);
-                }
             }
 
             // 2. Vincula os Participantes (Locatário, Proprietário, etc.)
@@ -48,14 +49,23 @@ public class ContractDAO {
             }
 
             // 3. Gera as Parcelas Financeiras
-            String sqlInstallments = "INSERT INTO Installments (dtdue, vlbase, cdstatus, nrinstallment, cdcontract) VALUES (?, ?, ?, ?, ?)";
+            int generatedInstallmentId = 0;
+            String sqlMaxInst = "SELECT COALESCE(MAX(cdinstallment), 0) FROM Installments";
+            try (Statement st = conn.createStatement();
+                 ResultSet rsMaxInst = st.executeQuery(sqlMaxInst)) {
+                if (rsMaxInst.next()) generatedInstallmentId = rsMaxInst.getInt(1);
+            }
+
+            String sqlInstallments = "INSERT INTO Installments (cdinstallment, dtdue, vlbase, cdstatus, nrinstallment, fk_contracts_cdcontract) VALUES (?, ?, ?, ?, ?, ?)";
             try (PreparedStatement stmtI = conn.prepareStatement(sqlInstallments)) {
                 for (Installments inst : installments) {
-                    stmtI.setDate(1, Date.valueOf(inst.getDtdue()));
-                    stmtI.setDouble(2, inst.getVlbase());
-                    stmtI.setInt(3, inst.getCdstatus());
-                    stmtI.setInt(4, inst.getNrinstallment());
-                    stmtI.setInt(5, generatedContractId);
+                    generatedInstallmentId++;
+                    stmtI.setInt(1, generatedInstallmentId);
+                    stmtI.setDate(2, Date.valueOf(inst.getDtdue()));
+                    stmtI.setDouble(3, inst.getVlbase());
+                    stmtI.setInt(4, inst.getCdstatus());
+                    stmtI.setInt(5, inst.getNrinstallment());
+                    stmtI.setInt(6, generatedContractId);
                     stmtI.addBatch();
                 }
                 stmtI.executeBatch();
@@ -121,7 +131,7 @@ public class ContractDAO {
    public boolean gerarExtrato(int idContract) {
     String sql = "SELECT c.dstitle, i.nrinstallment, i.dtdue, i.vlbase, idx.nmindex " +
                  "FROM Contracts c " +
-                 "JOIN Installments i ON c.cdcontract = i.cdcontract " +
+                 "JOIN Installments i ON c.cdcontract = i.fk_contracts_cdcontract " +
                  "JOIN Indexes idx ON c.cdindex = idx.cdindex " +
                  "WHERE c.cdcontract = ? ORDER BY i.nrinstallment";
 
@@ -170,5 +180,68 @@ public class ContractDAO {
             }
         } catch (SQLException e) { e.printStackTrace(); }
         return false;
+    }
+
+    public Contracts findById(int id) {
+        String sql = "SELECT * FROM Contracts WHERE cdcontract = ?";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Contracts c = new Contracts();
+                    c.setCdcontract(rs.getInt("cdcontract"));
+                    if (rs.getDate("dtcreation") != null) c.setDtcreation(rs.getDate("dtcreation").toLocalDate());
+                    c.setDstitle(rs.getString("dstitle"));
+                    c.setCdtemplate(rs.getInt("cdtemplate"));
+                    c.setCdproperty(rs.getInt("cdproperty"));
+                    c.setCdindex(rs.getInt("cdindex"));
+                    return c;
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
+    }
+
+    public void updateContract(Contracts c) {
+        String sql = "UPDATE Contracts SET dstitle=?, cdtemplate=?, cdindex=? WHERE cdcontract=?";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, c.getDstitle());
+            ps.setInt(2, c.getCdtemplate());
+            ps.setInt(3, c.getCdindex());
+            ps.setInt(4, c.getCdcontract());
+            ps.executeUpdate();
+            System.out.println("Contrato atualizado com sucesso!");
+        } catch (SQLException e) {
+            System.err.println("Erro ao atualizar contrato: " + e.getMessage());
+        }
+    }
+
+    public boolean deleteContract(int id) {
+        Connection conn = null;
+        try {
+            conn = Conexao.getConexao();
+            conn.setAutoCommit(false); // Inicia transação
+            // Exclui dependências manualmente para evitar erro de FK Constraints
+            conn.createStatement().executeUpdate("DELETE FROM Installments WHERE fk_contracts_cdcontract = " + id);
+            conn.createStatement().executeUpdate("DELETE FROM User_Contract_Contracts_Users_Roles WHERE cdcontract = " + id);
+            conn.createStatement().executeUpdate("DELETE FROM Commissions WHERE cdcontract = " + id);
+            conn.createStatement().executeUpdate("DELETE FROM Notifications WHERE cdcontract = " + id);
+            conn.createStatement().executeUpdate("DELETE FROM Variables WHERE cdcontract = " + id);
+            
+            PreparedStatement ps = conn.prepareStatement("DELETE FROM Contracts WHERE cdcontract = ?");
+            ps.setInt(1, id);
+            int rows = ps.executeUpdate();
+            
+            conn.commit();
+            return rows > 0;
+        } catch (SQLException e) {
+            if (conn != null) try { conn.rollback(); } catch (SQLException ex) {}
+            System.err.println("Erro ao excluir contrato (Rollback aplicado): " + e.getMessage());
+            return false;
+        } finally {
+            if (conn != null) try { conn.setAutoCommit(true); conn.close(); } catch (SQLException ex) {}
+        }
     }
 }

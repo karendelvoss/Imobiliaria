@@ -106,9 +106,15 @@ public class Main {
         System.out.println("\n--- PROCESSOS DE NEGÓCIO ---");
         System.out.println("1. EFETIVAR NOVO CONTRATO");
         System.out.println("2. VINCULAR PROPRIETÁRIO A IMÓVEL");
+        System.out.println("3. DESVINCULAR PROPRIETÁRIO DE IMÓVEL");
+        System.out.println("4. ALTERAR CONTRATO");
+        System.out.println("5. EXCLUIR CONTRATO");
         int op = Integer.parseInt(sc.nextLine());
         if (op == 1) realizarContrato();
         else if (op == 2) vincularDonoImovel();
+        else if (op == 3) desvincularDonoImovel();
+        else if (op == 4) alterarContrato();
+        else if (op == 5) excluirContrato();
     }
 
     private static void menuRelatorios() {
@@ -339,20 +345,121 @@ private static void excluirUsuario() {
 
     private static void realizarContrato() {
         System.out.println("\n--- NOVO CONTRATO ---");
-        System.out.print("ID Imóvel: "); int idP = Integer.parseInt(sc.nextLine());
-        System.out.print("ID Cliente: "); int idU = Integer.parseInt(sc.nextLine());
+        int idP = -1;
+        while (true) {
+            System.out.print("ID Imóvel (apenas disponíveis, 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                idP = Integer.parseInt(input);
+                Properties p = propertyDAO.findById(idP);
+                if (p != null && p.getCdstatus() == 1) {
+                    break;
+                } else {
+                    System.out.print("ERRO: Imóvel não encontrado ou indisponível. Ver lista de imóveis aptos? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) propertyDAO.getAvailableOnly().forEach(System.out::println);
+                }
+            } catch (Exception e) { System.out.println("Entrada inválida."); }
+        }
+
+        int idU = -1;
+        while (true) {
+            System.out.print("ID Cliente (Locatário/Comprador, 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                idU = Integer.parseInt(input);
+                if (userDAO.findById(idU) != null) break;
+                else {
+                    System.out.print("ERRO: Cliente não encontrado. Ver lista de clientes? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) userDAO.getAllUsersList().forEach(System.out::println);
+                }
+            } catch (Exception e) { System.out.println("Entrada inválida."); }
+        }
+
         Contracts c = new Contracts();
         c.setDtcreation(LocalDate.now());
         System.out.print("Título: "); c.setDstitle(sc.nextLine());
+        
+        int tpl = -1;
+        while (true) {
+            System.out.print("ID do Modelo de Contrato (Template, 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                tpl = Integer.parseInt(input);
+                if (contractTemplateDAO.findById(tpl) != null) {
+                    c.setCdtemplate(tpl);
+                    break;
+                } else {
+                    System.out.print("ERRO: Modelo não encontrado. Ver lista de modelos? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) {
+                        contractTemplateDAO.listAll().forEach(t -> 
+                            System.out.println("ID: " + t.getCdtemplate() + " | Nome: " + t.getNmtemplate())
+                        );
+                    }
+                }
+            } catch (Exception e) { System.out.println("Entrada inválida."); }
+        }
+
+        System.out.print("Tipo de Negócio (1=Locação/Parcelas Fixas, 2=Venda/Parcelas Personalizadas): ");
+        int tipoNegocio = Integer.parseInt(sc.nextLine());
+        
         c.setCdproperty(idP);
-        c.setCdindex(1);
+        
+        int idIndex = -1;
+        while (true) {
+            System.out.print("ID do Índice de Reajuste (0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                idIndex = Integer.parseInt(input);
+                if (indexDAO.findById(idIndex) != null) {
+                    c.setCdindex(idIndex);
+                    break;
+                } else {
+                    System.out.print("ERRO: Índice não encontrado. Ver lista de índices? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) {
+                        indexDAO.listAll().forEach(i -> 
+                            System.out.println("ID: " + i.getCdindex() + " | Nome: " + i.getNmindex())
+                        );
+                    }
+                }
+            } catch (Exception e) { System.out.println("Entrada inválida."); }
+        }
+        
         List<Installments> parcelas = new ArrayList<>();
-        System.out.print("Valor: "); double v = Double.parseDouble(sc.nextLine());
-        parcelas.add(criarParcela(1, v));
+        
+        System.out.print("Quantidade de Parcelas: "); int qtd = Integer.parseInt(sc.nextLine());
+        
+        if (tipoNegocio == 1) {
+            System.out.print("Valor de cada parcela: "); double v = Double.parseDouble(sc.nextLine());
+            for (int i = 1; i <= qtd; i++) parcelas.add(criarParcela(i, v));
+        } else {
+            System.out.println("Modo Venda/Personalizado. Preencha o valor de cada parcela:");
+            for (int i = 1; i <= qtd; i++) {
+                System.out.print("Valor da Parcela " + i + ": ");
+                double v = Double.parseDouble(sc.nextLine());
+                parcelas.add(criarParcela(i, v));
+            }
+        }
+
         List<User_Contract> partes = new ArrayList<>();
-        User_Contract uc = new User_Contract(); uc.setCduser(idU); uc.setCdrole(2);
+        
+        // 1. Vincular Proprietários automaticamente
+        List<Integer> donos = propertyDAO.getOwnerIdsByProperty(idP);
+        for (int idDono : donos) {
+            User_Contract ud = new User_Contract(); ud.setCduser(idDono); ud.setCdrole(1);
+            partes.add(ud);
+        }
+        
+        // 2. Vincular Cliente (Locatário ou Comprador)
+        User_Contract uc = new User_Contract(); uc.setCduser(idU); uc.setCdrole(tipoNegocio == 1 ? 2 : 4);
         partes.add(uc);
-        contractDAO.processFullContract(c, partes, parcelas, null, 2);
+        
+        // 3. Atualizar Status (2 = Alugado, 3 = Vendido)
+        int novoStatus = (tipoNegocio == 1) ? 2 : 3;
+        contractDAO.processFullContract(c, partes, parcelas, null, novoStatus);
     }
 
     private static Installments criarParcela(int num, double valor) {
@@ -363,14 +470,236 @@ private static void excluirUsuario() {
     }
 
     private static void vincularDonoImovel() {
-        System.out.print("ID Imóvel: "); int idP = Integer.parseInt(sc.nextLine());
-        System.out.print("ID Usuário: "); int idU = Integer.parseInt(sc.nextLine());
+        System.out.println("\n--- VINCULAR PROPRIETÁRIO A IMÓVEL ---");
+        int idP = -1;
+        while (true) {
+            System.out.print("ID Imóvel (ou 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                idP = Integer.parseInt(input);
+                if (propertyDAO.findById(idP) != null) {
+                    break;
+                } else {
+                    System.out.print("ERRO: Imóvel não encontrado. Deseja ver a lista de imóveis disponíveis? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) {
+                        propertyDAO.getAvailableProperties().forEach(System.out::println);
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Entrada inválida.");
+            }
+        }
+
+        int idU = -1;
+        while (true) {
+            System.out.print("ID Usuário Proprietário (ou 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                idU = Integer.parseInt(input);
+                if (userDAO.findById(idU) != null) {
+                    break;
+                } else {
+                    System.out.print("ERRO: Usuário não encontrado. Deseja ver a lista de usuários? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) {
+                        userDAO.getAllUsersList().forEach(System.out::println);
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Entrada inválida.");
+            }
+        }
+
+        if (propertyDAO.hasAlreadyThisOwner(idP, idU)) {
+            System.out.println("\nAVISO: Este usuário já está vinculado como proprietário deste imóvel.");
+            return;
+        }
+
         propertyDAO.linkOwner(idP, idU);
     }
 
+    private static void desvincularDonoImovel() {
+        System.out.println("\n--- DESVINCULAR PROPRIETÁRIO DE IMÓVEL ---");
+        int idP = -1;
+        while (true) {
+            System.out.print("ID Imóvel (ou 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                idP = Integer.parseInt(input);
+                if (propertyDAO.findById(idP) != null) {
+                    break;
+                } else {
+                    System.out.print("ERRO: Imóvel não encontrado. Deseja ver a lista de imóveis com proprietários vinculados? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) {
+                        List<String> imoveis = propertyDAO.getPropertiesWithOwners();
+                        if (imoveis.isEmpty()) {
+                            System.out.println("AVISO: Nenhum imóvel possui proprietários vinculados no momento.");
+                            return;
+                        } else {
+                            imoveis.forEach(System.out::println);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Entrada inválida.");
+            }
+        }
+
+        int idU = -1;
+        while (true) {
+            System.out.print("ID Usuário Proprietário (ou 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                idU = Integer.parseInt(input);
+                if (propertyDAO.hasAlreadyThisOwner(idP, idU)) {
+                    break;
+                } else {
+                    System.out.print("ERRO: Este usuário não é proprietário deste imóvel. Deseja ver a lista de proprietários vinculados? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) {
+                        List<String> donos = propertyDAO.getOwnersByProperty(idP);
+                        if (donos.isEmpty()) {
+                            System.out.println("AVISO: Nenhum proprietário vinculado a este imóvel.");
+                            return;
+                        } else {
+                            donos.forEach(System.out::println);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Entrada inválida.");
+            }
+        }
+
+        System.out.print("Confirmar desvinculação? (s/n): ");
+        if (sc.nextLine().equalsIgnoreCase("s")) {
+            propertyDAO.unlinkOwner(idP, idU);
+        } else {
+            System.out.println("Operação cancelada.");
+        }
+    }
+
+    private static void alterarContrato() {
+        System.out.println("\n--- ALTERAR CONTRATO ---");
+        while (true) {
+            System.out.print("ID Contrato (ou 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                int idC = Integer.parseInt(input);
+                Contracts c = contractDAO.findById(idC);
+                if (c != null) {
+                    System.out.println("Pressione ENTER para manter o valor atual.");
+                    System.out.print("Título (" + c.getDstitle() + "): ");
+                    String tit = sc.nextLine();
+                    if (!tit.isEmpty()) c.setDstitle(tit);
+
+                    while (true) {
+                        System.out.print("ID Modelo (" + c.getCdtemplate() + "): ");
+                        String tpl = sc.nextLine();
+                        if (tpl.isEmpty()) break; // Pressionou ENTER, mantém o valor atual
+                        try {
+                            int idTpl = Integer.parseInt(tpl);
+                            if (contractTemplateDAO.findById(idTpl) != null) {
+                                c.setCdtemplate(idTpl);
+                                break;
+                            } else {
+                                System.out.print("ERRO: Modelo não encontrado. Ver lista de modelos? (s/n): ");
+                                if (sc.nextLine().equalsIgnoreCase("s")) {
+                                    contractTemplateDAO.listAll().forEach(t -> 
+                                        System.out.println("ID: " + t.getCdtemplate() + " | Nome: " + t.getNmtemplate())
+                                    );
+                                }
+                            }
+                        } catch (Exception e) { System.out.println("Entrada inválida."); }
+                    }
+
+                    while (true) {
+                        System.out.print("ID Índice de Reajuste (" + c.getCdindex() + "): ");
+                        String idx = sc.nextLine();
+                        if (idx.isEmpty()) break; // Pressionou ENTER, mantém o valor atual
+                        try {
+                            int idIdx = Integer.parseInt(idx);
+                            if (indexDAO.findById(idIdx) != null) {
+                                c.setCdindex(idIdx);
+                                break;
+                            } else {
+                                System.out.print("ERRO: Índice não encontrado. Ver lista de índices? (s/n): ");
+                                if (sc.nextLine().equalsIgnoreCase("s")) {
+                                    indexDAO.listAll().forEach(i -> 
+                                        System.out.println("ID: " + i.getCdindex() + " | Nome: " + i.getNmindex())
+                                    );
+                                }
+                            }
+                        } catch (Exception e) { System.out.println("Entrada inválida."); }
+                    }
+
+                    contractDAO.updateContract(c);
+                    break;
+                } else {
+                    System.out.print("ERRO: Contrato não encontrado. Deseja ver a lista de contratos? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) {
+                        contractDAO.getActiveContractsList().forEach(System.out::println);
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Entrada inválida.");
+            }
+        }
+    }
+
+    private static void excluirContrato() {
+        System.out.println("\n--- EXCLUIR CONTRATO ---");
+        while (true) {
+            System.out.print("ID Contrato (ou 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                int idC = Integer.parseInt(input);
+                Contracts c = contractDAO.findById(idC);
+                if (c != null) {
+                    System.out.println("ATENÇÃO: Excluir o contrato apagará TODAS as parcelas, notificações e comissões vinculadas a ele.");
+                    System.out.print("Confirmar exclusão do contrato '" + c.getDstitle() + "'? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) {
+                        if (contractDAO.deleteContract(idC)) {
+                            System.out.println("Contrato excluído com sucesso!");
+                            System.out.print("Deseja voltar o status do Imóvel ID " + c.getCdproperty() + " para 'Disponível' (1)? (s/n): ");
+                            if (sc.nextLine().equalsIgnoreCase("s")) {
+                                Properties p = propertyDAO.findById(c.getCdproperty());
+                                if (p != null) { p.setCdstatus(1); propertyDAO.updateProperty(p); }
+                            }
+                        }
+                    } else System.out.println("Operação cancelada.");
+                    break;
+                } else {
+                    System.out.print("ERRO: Contrato não encontrado. Listar contratos? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) contractDAO.getActiveContractsList().forEach(System.out::println);
+                }
+            } catch (Exception e) { System.out.println("Entrada inválida."); }
+        }
+    }
+
     private static void relatorioFinanceiroContrato() {
-        System.out.print("ID Contrato: ");
-        contractDAO.gerarExtrato(Integer.parseInt(sc.nextLine()));
+        System.out.println("\n--- EXTRATO FINANCEIRO ---");
+        while (true) {
+            System.out.print("ID Contrato (ou 0 para cancelar): ");
+            String input = sc.nextLine();
+            if (input.isEmpty() || input.equals("0")) return;
+            try {
+                int idC = Integer.parseInt(input);
+                if (contractDAO.contractExists(idC)) {
+                    contractDAO.gerarExtrato(idC);
+                    break;
+                } else {
+                    System.out.print("ERRO: Contrato não encontrado. Deseja ver a lista de contratos disponíveis? (s/n): ");
+                    if (sc.nextLine().equalsIgnoreCase("s")) {
+                        contractDAO.getActiveContractsList().forEach(System.out::println);
+                    }
+                }
+            } catch (Exception e) { System.out.println("Entrada inválida."); }
+        }
     }
 
     // =========================================================

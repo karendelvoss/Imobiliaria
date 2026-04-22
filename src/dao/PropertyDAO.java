@@ -81,6 +81,28 @@ public class PropertyDAO {
         }
     }
 
+    // Desvincular Proprietário de Imóvel (N:N relationship)
+    public void unlinkOwner(int idProperty, int idUser) {
+        String sql = "DELETE FROM Properties_Users WHERE cdproperty = ? AND cduser = ?";
+        
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            
+            ps.setInt(1, idProperty);
+            ps.setInt(2, idUser);
+            
+            int rows = ps.executeUpdate();
+            if (rows > 0) {
+                System.out.println("Proprietário desvinculado do imóvel com sucesso!");
+            } else {
+                System.out.println("Nenhum vínculo encontrado para remoção.");
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("Erro ao desvincular proprietário: " + e.getMessage());
+        }
+    }
+
     // 3. List all Properties (Following the logical model columns)
     public List<Properties> listAll() {
         List<Properties> list = new ArrayList<>();
@@ -319,6 +341,38 @@ public List<String> getOwnersByProperty(int idProp) {
     } catch (SQLException e) { e.printStackTrace(); }
     return owners;
 }
+
+public List<Integer> getOwnerIdsByProperty(int idProp) {
+    List<Integer> owners = new ArrayList<>();
+    String sql = "SELECT cduser FROM properties_users WHERE cdproperty = ?";
+    try (Connection conn = Conexao.getConexao();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+        ps.setInt(1, idProp);
+        try (ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                owners.add(rs.getInt("cduser"));
+            }
+        }
+    } catch (SQLException e) { e.printStackTrace(); }
+    return owners;
+}
+
+public List<String> getPropertiesWithOwners() {
+    List<String> list = new ArrayList<>();
+    String sql = "SELECT DISTINCT p.cdproperty, p.nrregistration " +
+                 "FROM properties p " +
+                 "JOIN properties_users pu ON p.cdproperty = pu.cdproperty " +
+                 "ORDER BY p.cdproperty";
+    try (Connection conn = Conexao.getConexao();
+         PreparedStatement stmt = conn.prepareStatement(sql);
+         ResultSet rs = stmt.executeQuery()) {
+        while (rs.next()) {
+            list.add("ID: " + rs.getInt("cdproperty") + " | Reg: " + rs.getString("nrregistration"));
+        }
+    } catch (SQLException e) { e.printStackTrace(); }
+    return list;
+}
+
 public boolean isUserOwner(int idProp, int idUser) {
     String sql = "SELECT 1 FROM properties_users WHERE cdproperty = ? AND cduser = ?";
     try (Connection conn = Conexao.getConexao();
@@ -386,7 +440,7 @@ public String findByIdDetalhado(int id) {
 
 public void relatorioCompletoImoveis() {
     // Ajustado também para evitar erro no módulo de relatórios
-    String sql = "SELECT p.cdproperty, p.nrregistration, t.nmtype, s.nmstatus, a.nraddress " +
+    String sql = "SELECT p.cdproperty, p.nrregistration, t.nmtype, s.nmstatus, a.nmstreet, a.nraddress " +
                  "FROM properties p " +
                  "JOIN property_types t ON p.cdtype = t.cdtype " +
                  "JOIN property_status s ON p.cdstatus = s.cdstatus " +
@@ -395,12 +449,13 @@ public void relatorioCompletoImoveis() {
          Statement st = conn.createStatement();
          ResultSet rs = st.executeQuery(sql)) {
         
-        System.out.println("\nID  | MATRÍCULA | TIPO       | STATUS     | ENDEREÇO/Nº");
-        System.out.println("------------------------------------------------------------------");
+        System.out.println("\nID  | MATRÍCULA | TIPO           | STATUS     | ENDEREÇO COMPLETO");
+        System.out.println("--------------------------------------------------------------------------------------");
         while (rs.next()) {
-            System.out.printf("%-3d | %-9s | %-10s | %-10s | %s\n", 
+            String enderecoCompleto = rs.getString("nmstreet") + ", nº " + rs.getString("nraddress");
+            System.out.printf("%-3d | %-9s | %-14s | %-10s | %s\n", 
                 rs.getInt("cdproperty"), rs.getString("nrregistration"), 
-                rs.getString("nmtype"), rs.getString("nmstatus"), rs.getString("nraddress"));
+                rs.getString("nmtype"), rs.getString("nmstatus"), enderecoCompleto);
         }
     } catch (SQLException e) { 
         System.err.println("Erro no relatório: " + e.getMessage());
