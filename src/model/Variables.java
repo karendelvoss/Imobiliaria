@@ -4,7 +4,7 @@ public class Variables {
     private int cdvariable;      // Primary Key
     private String nmvariable;   // varchar(50) - Nome da tag (ex: {{nome_cliente}})
     private String vlvariable;   // varchar(255) - Valor real
-    private String tpvariable;   // varchar - Tipo (Texto, Moeda, Data)
+    private int tpvariable;      // int - Tipo (1=Texto, 2=Moeda, 3=Data)
     private boolean fgtriggeralert; // boolean - Disparar alerta?
     private int cdcontract;      // Foreign Key para Contracts
 
@@ -28,10 +28,10 @@ public class Variables {
     public void setVlvariable(String vlvariable) {
         this.vlvariable = vlvariable;
     }
-    public String getTpvariable() {
+    public int getTpvariable() {
         return tpvariable;
     }
-    public void setTpvariable(String tpvariable) {
+    public void setTpvariable(int tpvariable) {
         this.tpvariable = tpvariable;
     }
     public boolean isFgtriggeralert() {

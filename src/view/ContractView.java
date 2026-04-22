@@ -72,6 +72,21 @@ public class ContractView {
                 () -> userDAO.getAllUsersList().forEach(System.out::println));
         if (idU == -1) return;
 
+        // --- VALIDAÇÃO DE REGRA DE NEGÓCIO: PROPRIETÁRIO VS LOCATÁRIO ---
+        List<Integer> donos = propertyDAO.getOwnerIdsByProperty(idP);
+        if (donos.contains(idU)) {
+            if (donos.size() == 1) {
+                System.out.println("ERRO: O cliente selecionado é o ÚNICO proprietário deste imóvel.");
+                System.out.println("Não é possível celebrar um contrato consigo mesmo.");
+                return;
+            } else {
+                if (!confirmar("AVISO: O cliente selecionado também é um dos proprietários deste imóvel. Deseja prosseguir? (s/n): ")) {
+                    System.out.println("Operação cancelada.");
+                    return;
+                }
+            }
+        }
+
         int idTpl = lerIdValido("ID do Modelo de Contrato (Template)",
                 templateDAO::findById,
                 () -> templateDAO.listAll().forEach(

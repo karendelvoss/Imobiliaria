@@ -137,23 +137,21 @@ public class ReportService {
             return;
         }
 
-        System.out.println("\n========================================================================================================================");
+        System.out.println("\n=========================================================================================");
         System.out.printf("                                     RELATÓRIO DE PARTES (Contrato #%d)\n", contractId);
-        System.out.println("========================================================================================================================");
-        System.out.printf("%-25s | %-18s | %-20s | %-15s | %-20s | %-15s\n",
-                "Nome/Razão Social", "CPF/CNPJ", "Papel", "Participação", "Contato Principal", "Status Assinatura");
-        System.out.println("------------------------------------------------------------------------------------------------------------------------");
+        System.out.println("=========================================================================================");
+        System.out.printf("%-25s | %-18s | %-20s | %-20s\n",
+                "Nome/Razão Social", "CPF/CNPJ", "Papel", "Contato Principal");
+        System.out.println("-----------------------------------------------------------------------------------------");
 
         for (ParticipantDTO p : participants) {
-            System.out.printf("%-25s | %-18s | %-20s | %-15.2f%% | %-20s | %-15s\n",
+            System.out.printf("%-25s | %-18s | %-20s | %-20s\n",
                     p.getNomeRazaoSocial(),
                     p.getCpfCnpj(),
                     p.getPapelRole(),
-                    p.getPercentualParticipacao(),
-                    p.getContatoPrincipal(),
-                    p.getStatusAssinatura());
+                    p.getContatoPrincipal());
         }
-        System.out.println("========================================================================================================================");
+        System.out.println("=========================================================================================");
     }
 
     /**

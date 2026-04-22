@@ -64,6 +64,8 @@ public class ReportView {
             System.out.println("\n--- CONTRATOS DISPONÍVEIS ---");
             if (contratos.isEmpty()) {
                 System.out.println("Nenhum contrato encontrado no sistema.");
+                System.out.println("-----------------------------\n");
+                return false; // Aborta e volta pro menu imediatamente
             } else {
                 for (String c : contratos) {
                     System.out.println(c);

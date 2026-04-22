@@ -39,13 +39,17 @@ public class Main {
         VariableDAO variableDAO = new VariableDAO();
         CommissionDAO commissionDAO = new CommissionDAO();
         BrokerDataDAO brokerDataDAO = new BrokerDataDAO();
+        StateDAO stateDAO = new StateDAO();
+        AddressDAO addressDAO = new AddressDAO();
+        IndexRateDAO indexRateDAO = new IndexRateDAO();
 
         DomainCrudView domainView = new DomainCrudView(
                 new CountryDAO(), new CityDAO(), new DistrictDAO(),
                 new PropertyTypeDAO(), new PropertyPurposeDAO(), new PropertyStatusDAO(),
                 templateDAO, new ClauseDAO(), indexDAO, new RoleDAO(),
                 new BankAccountDAO(), new NotificationDAO(),
-                topicDAO, variableDAO, commissionDAO, brokerDataDAO);
+                topicDAO, variableDAO, commissionDAO, brokerDataDAO,
+                stateDAO, addressDAO, indexRateDAO);
 
         Main app = new Main(
                 new UserView(userDAO),
@@ -104,10 +108,12 @@ public class Main {
                 case 6:
                     System.out.println("\n--- 6. OUTROS DOMÍNIOS ---");
                     System.out.println("1. Profissões");
-                    System.out.println("2. Contas Bancárias e Notificações");
+                    System.out.println("2. Contas Bancárias");
+                    System.out.println("3. Notificações");
                     int subOp = ConsoleIO.lerIntSeguro("Escolha: ");
                     if (subOp == 1) occupationView.menu();
-                    else if (subOp == 2) domainView.menuOutros();
+                    else if (subOp == 2) domainView.crudBankAccount();
+                    else if (subOp == 3) domainView.crudNotification();
                     break;
                 case 0: break;
                 default: System.out.println("Opção inválida!");

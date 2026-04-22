@@ -18,7 +18,6 @@ public class VariableDAO {
             ps.setInt(1, proxId);
             ps.setString(2, v.getNmvariable());
             ps.setString(3, v.getVlvariable());
-            ps.setString(4, v.getTpvariable());
             ps.setInt(4, v.getTpvariable());
             ps.setBoolean(5, v.isFgtriggeralert());
             ps.setInt(6, v.getCdcontract());
@@ -37,7 +36,6 @@ public class VariableDAO {
                     v.setCdvariable(rs.getInt("cdvariable"));
                     v.setNmvariable(rs.getString("nmvariable"));
                     v.setVlvariable(rs.getString("vlvariable"));
-                    v.setTpvariable(rs.getString("tpvariable"));
                     v.setTpvariable(rs.getInt("tpvariable"));
                     v.setFgtriggeralert(rs.getBoolean("fgtriggeralert"));
                     v.setCdcontract(rs.getInt("cdcontract"));
@@ -57,7 +55,6 @@ public class VariableDAO {
                 v.setCdvariable(rs.getInt("cdvariable"));
                 v.setNmvariable(rs.getString("nmvariable"));
                 v.setVlvariable(rs.getString("vlvariable"));
-                v.setTpvariable(rs.getString("tpvariable"));
                 v.setTpvariable(rs.getInt("tpvariable"));
                 v.setFgtriggeralert(rs.getBoolean("fgtriggeralert"));
                 v.setCdcontract(rs.getInt("cdcontract"));
@@ -70,7 +67,6 @@ public class VariableDAO {
     public void update(Variables v) {
         String sql = "UPDATE Variables SET nmvariable=?, vlvariable=?, tpvariable=?, fgtriggeralert=?, cdcontract=? WHERE cdvariable=?";
         try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, v.getNmvariable()); ps.setString(2, v.getVlvariable()); ps.setString(3, v.getTpvariable());
             ps.setString(1, v.getNmvariable()); ps.setString(2, v.getVlvariable()); ps.setInt(3, v.getTpvariable());
             ps.setBoolean(4, v.isFgtriggeralert()); ps.setInt(5, v.getCdcontract()); ps.setInt(6, v.getCdvariable()); ps.executeUpdate();
         } catch (SQLException e) { e.printStackTrace(); }

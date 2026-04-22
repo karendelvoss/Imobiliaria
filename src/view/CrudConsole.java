@@ -58,14 +58,28 @@ public final class CrudConsole {
                 case 1: dao.insert(fabricaNovo.get()); break;
                 case 2: dao.listAll().forEach(e -> System.out.println(impressora.apply(e))); break;
                 case 3: {
-                    int id = ConsoleIO.lerInt("ID: ");
+                    int id = ConsoleIO.lerInt("ID para atualizar: ");
                     T alvo = finder.apply(id);
-                    if (alvo == null) { System.out.println("ID não encontrado."); return; }
+                    if (alvo == null) { 
+                        System.out.println("ID não encontrado. Opções disponíveis:");
+                        dao.listAll().forEach(e -> System.out.println(impressora.apply(e)));
+                        break; 
+                    }
                     editor.accept(alvo);
                     dao.update(alvo);
                     break;
                 }
-                case 4: dao.delete(ConsoleIO.lerInt("ID para excluir: ")); break;
+                case 4: {
+                    int id = ConsoleIO.lerInt("ID para excluir: ");
+                    T alvo = finder.apply(id);
+                    if (alvo == null) { 
+                        System.out.println("ID não encontrado. Opções disponíveis:");
+                        dao.listAll().forEach(e -> System.out.println(impressora.apply(e)));
+                        break; 
+                    }
+                    dao.delete(id);
+                    break;
+                }
                 case 0: break;
                 default: System.out.println("Opção inválida.");
             }

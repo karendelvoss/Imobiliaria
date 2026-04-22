@@ -15,6 +15,9 @@ import dao.NotificationDAO;
 import dao.PropertyPurposeDAO;
 import dao.PropertyStatusDAO;
 import dao.PropertyTypeDAO;
+import dao.StateDAO;
+import dao.AddressDAO;
+import dao.IndexRateDAO;
 import dao.RoleDAO;
 import model.Bank_Accounts;
 import model.Cities;
@@ -32,6 +35,9 @@ import model.Topics;
 import model.Variables;
 import model.Commissions;
 import model.Broker_Data;
+import model.States;
+import model.Addresses;
+import model.Index_Rates;
 
 import java.time.LocalDate;
 
@@ -59,6 +65,9 @@ public class DomainCrudView {
     private final VariableDAO variableDAO;
     private final CommissionDAO commissionDAO;
     private final BrokerDataDAO brokerDataDAO;
+    private final StateDAO stateDAO;
+    private final AddressDAO addressDAO;
+    private final IndexRateDAO indexRateDAO;
 
     public DomainCrudView(CountryDAO countryDAO, CityDAO cityDAO, DistrictDAO districtDAO,
                           PropertyTypeDAO propertyTypeDAO, PropertyPurposeDAO propertyPurposeDAO,
@@ -66,7 +75,8 @@ public class DomainCrudView {
                           ClauseDAO clauseDAO, IndexDAO indexDAO, RoleDAO roleDAO,
                           BankAccountDAO bankAccountDAO, NotificationDAO notificationDAO,
                           TopicDAO topicDAO, VariableDAO variableDAO, 
-                          CommissionDAO commissionDAO, BrokerDataDAO brokerDataDAO) {
+                          CommissionDAO commissionDAO, BrokerDataDAO brokerDataDAO,
+                          StateDAO stateDAO, AddressDAO addressDAO, IndexRateDAO indexRateDAO) {
         this.countryDAO = countryDAO;
         this.cityDAO = cityDAO;
         this.districtDAO = districtDAO;
@@ -83,17 +93,22 @@ public class DomainCrudView {
         this.variableDAO = variableDAO;
         this.commissionDAO = commissionDAO;
         this.brokerDataDAO = brokerDataDAO;
+        this.stateDAO = stateDAO;
+        this.addressDAO = addressDAO;
+        this.indexRateDAO = indexRateDAO;
     }
 
     // --- Submenus ---
 
     public void menuLocalizacao() {
         System.out.println("\n--- LOCALIZAÇÃO ---");
-        System.out.println("1. Países  2. Cidades  3. Bairros  0. Voltar");
+        System.out.println("1. Países  2. Estados  3. Cidades  4. Bairros  5. Endereços  0. Voltar");
         switch (lerIntSeguro("Escolha: ")) {
             case 1: crudCountry(); break;
-            case 2: crudCity(); break;
-            case 3: crudDistrict(); break;
+            case 2: crudState(); break;
+            case 3: crudCity(); break;
+            case 4: crudDistrict(); break;
+            case 5: crudAddress(); break;
         }
     }
 
@@ -109,26 +124,18 @@ public class DomainCrudView {
 
     public void menuAtributosContratuais() {
         System.out.println("\n--- DOMÍNIOS CONTRATUAIS ---");
-        System.out.println("1. Modelos (Templates)  2. Cláusulas  3. Índices  4. Papéis");
-        System.out.println("5. Tópicos  6. Variáveis  7. Comissões  8. Corretores  0. Voltar");
+        System.out.println("1. Modelos (Templates)  2. Cláusulas  3. Índices  4. Taxas de Índice  5. Papéis");
+        System.out.println("6. Tópicos  7. Variáveis  8. Comissões  9. Corretores  0. Voltar");
         switch (lerIntSeguro("Escolha: ")) {
             case 1: crudContractTemplate(); break;
             case 2: crudClause(); break;
             case 3: crudIndex(); break;
-            case 4: crudRole(); break;
-            case 5: crudTopic(); break;
-            case 6: crudVariable(); break;
-            case 7: crudCommission(); break;
-            case 8: crudBrokerData(); break;
-        }
-    }
-
-    public void menuOutros() {
-        System.out.println("\n--- OUTROS DOMÍNIOS ---");
-        System.out.println("1. Contas Bancárias  2. Notificações  0. Voltar");
-        switch (lerIntSeguro("Escolha: ")) {
-            case 1: crudBankAccount(); break;
-            case 2: crudNotification(); break;
+            case 4: crudIndexRate(); break;
+            case 5: crudRole(); break;
+            case 6: crudTopic(); break;
+            case 7: crudVariable(); break;
+            case 8: crudCommission(); break;
+            case 9: crudBrokerData(); break;
         }
     }
 
@@ -149,6 +156,25 @@ public class DomainCrudView {
                 countryDAO::findById,
                 c -> c.getCdcountry() + " - " + c.getNmcountry() + " (" + c.getSgcountry() + ")",
                 CrudConsole.adapt(countryDAO::insert, countryDAO::update, countryDAO::delete, countryDAO::listAll));
+    }
+
+    private void crudState() {
+        CrudConsole.run("Estados",
+                () -> {
+                    States s = new States();
+                    s.setNmstate(ler("Nome: "));
+                    s.setSgstate(ler("Sigla: "));
+                    s.setCdcountry(lerInt("ID País: "));
+                    return s;
+                },
+                s -> {
+                    s.setNmstate(lerOuManter("Novo Nome", s.getNmstate()));
+                    s.setSgstate(lerOuManter("Nova Sigla", s.getSgstate()));
+                    s.setCdcountry(lerIntOuManter("Novo ID País", s.getCdcountry()));
+                },
+                stateDAO::findById,
+                s -> s.getCdstate() + " - " + s.getNmstate() + " (" + s.getSgstate() + ") [País: " + s.getCdcountry() + "]",
+                CrudConsole.adapt(stateDAO::insert, stateDAO::update, stateDAO::delete, stateDAO::listAll));
     }
 
     private void crudCity() {
@@ -183,6 +209,29 @@ public class DomainCrudView {
                 districtDAO::findById,
                 d -> d.getCddistrict() + " - " + d.getNmdistrict() + " (Cid ID: " + d.getCdcity() + ")",
                 CrudConsole.adapt(districtDAO::insert, districtDAO::update, districtDAO::delete, districtDAO::listAll));
+    }
+
+    private void crudAddress() {
+        CrudConsole.run("Endereços",
+                () -> {
+                    Addresses a = new Addresses();
+                    a.setCdzipcode(ler("CEP: "));
+                    a.setNmstreet(ler("Rua: "));
+                    a.setNraddress(ler("Número: "));
+                    a.setDscomplement(ler("Complemento: "));
+                    a.setCddistrict(lerInt("ID Bairro: "));
+                    return a;
+                },
+                a -> {
+                    a.setCdzipcode(lerOuManter("Novo CEP", a.getCdzipcode()));
+                    a.setNmstreet(lerOuManter("Nova Rua", a.getNmstreet()));
+                    a.setNraddress(lerOuManter("Novo Número", a.getNraddress()));
+                    a.setDscomplement(lerOuManter("Novo Complemento", a.getDscomplement()));
+                    a.setCddistrict(lerIntOuManter("Novo ID Bairro", a.getCddistrict()));
+                },
+                addressDAO::findById,
+                a -> a.getCdaddress() + " - " + a.getNmstreet() + ", " + a.getNraddress() + " (" + a.getCdzipcode() + ")",
+                CrudConsole.adapt(addressDAO::insert, addressDAO::update, addressDAO::delete, addressDAO::listAll));
     }
 
     private void crudPropertyType() {
@@ -256,6 +305,27 @@ public class DomainCrudView {
                 CrudConsole.adapt(indexDAO::insert, indexDAO::update, indexDAO::delete, indexDAO::listAll));
     }
 
+    private void crudIndexRate() {
+        CrudConsole.run("Taxas de Índice",
+                () -> {
+                    Index_Rates ir = new Index_Rates();
+                    ir.setRefmonth(lerInt("Mês Ref (MM): "));
+                    ir.setRefyear(lerInt("Ano Ref (AAAA): "));
+                    ir.setVlrate(lerDouble("Valor Taxa (%): "));
+                    ir.setFk_Indexes_cdindex(lerInt("ID Índice: "));
+                    return ir;
+                },
+                ir -> {
+                    ir.setRefmonth(lerIntOuManter("Mês Ref", ir.getRefmonth()));
+                    ir.setRefyear(lerIntOuManter("Ano Ref", ir.getRefyear()));
+                    try { ir.setVlrate(Double.parseDouble(lerOuManter("Valor Taxa", String.valueOf(ir.getVlrate())))); } catch (Exception e) {}
+                    ir.setFk_Indexes_cdindex(lerIntOuManter("ID Índice", ir.getFk_Indexes_cdindex()));
+                },
+                indexRateDAO::findById,
+                ir -> ir.getCdrate() + " - " + ir.getRefmonth() + "/" + ir.getRefyear() + " | Taxa: " + ir.getVlrate() + "% [Índice ID: " + ir.getFk_Indexes_cdindex() + "]",
+                CrudConsole.adapt(indexRateDAO::insertRate, indexRateDAO::update, indexRateDAO::delete, indexRateDAO::listAll));
+    }
+
     private void crudRole() {
         CrudConsole.run("Papéis Contratuais",
                 () -> { Roles r = new Roles(); r.setNmrole(ler("Papel: ")); return r; },
@@ -265,7 +335,7 @@ public class DomainCrudView {
                 CrudConsole.adapt(roleDAO::insert, roleDAO::update, roleDAO::delete, roleDAO::listAll));
     }
 
-    private void crudBankAccount() {
+    public void crudBankAccount() {
         CrudConsole.run("Contas Bancárias",
                 () -> {
                     Bank_Accounts b = new Bank_Accounts();
@@ -287,7 +357,7 @@ public class DomainCrudView {
                 CrudConsole.adapt(bankAccountDAO::insert, bankAccountDAO::update, bankAccountDAO::delete, bankAccountDAO::listAll));
     }
 
-    private void crudNotification() {
+    public void crudNotification() {
         CrudConsole.run("Notificações",
                 () -> {
                     Notifications n = new Notifications();
@@ -325,7 +395,7 @@ public class DomainCrudView {
                     Variables v = new Variables();
                     v.setNmvariable(ler("Nome: "));
                     v.setVlvariable(ler("Valor: "));
-                    v.setTpvariable(ler("Tipo (Texto, Moeda, Data): "));
+                    v.setTpvariable(lerInt("Tipo (1=Texto, 2=Moeda, 3=Data): "));
                     v.setFgtriggeralert(confirmar("Gera Alerta? (s/n): "));
                     v.setCdcontract(lerInt("ID Contrato: "));
                     return v;
@@ -333,7 +403,7 @@ public class DomainCrudView {
                 v -> {
                     v.setNmvariable(lerOuManter("Nome", v.getNmvariable()));
                     v.setVlvariable(lerOuManter("Valor", v.getVlvariable()));
-                    v.setTpvariable(lerOuManter("Tipo", v.getTpvariable()));
+                    v.setTpvariable(lerIntOuManter("Tipo", v.getTpvariable()));
                     v.setFgtriggeralert(confirmar("Gera Alerta? (s/n): "));
                     v.setCdcontract(lerIntOuManter("ID Contrato", v.getCdcontract()));
                 },

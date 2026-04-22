@@ -60,10 +60,13 @@ public class PropertyView {
     }
 
     private void consultar() {
-        int id = lerInt("ID do Imóvel: ");
-        if (id <= 0) return;
+        int id = lerIdValido("ID do Imóvel para consulta (0 para cancelar)",
+                propertyDAO::findById,
+                () -> propertyDAO.getAvailableProperties().forEach(System.out::println));
+        if (id == -1) { System.out.println("Operação cancelada."); return; }
+
         String info = propertyDAO.findByIdDetalhado(id);
-        System.out.println(info != null ? info : "ID não localizado.");
+        System.out.println(info != null ? info : "Erro ao carregar detalhes do imóvel.");
     }
 
     private void atualizar() {
@@ -88,28 +91,22 @@ public class PropertyView {
     }
 
     private void excluir() {
-        while (true) {
-            String input = ler("\nID do imóvel para EXCLUIR: ");
-            if (input.isEmpty()) return;
-            int id = Integer.parseInt(input);
-            Properties p = propertyDAO.findById(id);
-            if (p == null) {
-                System.out.println("ERRO: O ID " + id + " não existe no sistema.");
-                if (confirmar("Deseja ver a lista de imóveis que PODEM ser excluídos? (s/n): ")) {
-                    mostrarExcluiveis();
-                }
-                return;
-            }
-            if (p.getCdstatus() != 2) { // Status 2 = Disponível
-                System.out.println("\nAVISO: O imóvel ID " + id + " não está 'Disponível' (pode estar alugado/vendido), exclusão não permitida!");
-                if (confirmar("Ver lista de imóveis aptos para exclusão? (s/n): ")) mostrarExcluiveis();
-                return;
-            }
-            if (confirmar("Confirmar exclusão de '" + p.getNrregistration() + "'? (s/n): ")) {
-                propertyDAO.deleteProperty(id);
-                System.out.println("Imóvel removido!");
-            }
+        int id = lerIdValido("ID do imóvel para EXCLUIR (0 para cancelar)",
+                propertyDAO::findById,
+                () -> propertyDAO.getAvailableProperties().forEach(System.out::println));
+        if (id == -1) { System.out.println("Operação cancelada."); return; }
+
+        Properties p = propertyDAO.findById(id);
+
+        if (p.getCdstatus() != 2) { // Status 2 = Disponível
+            System.out.println("\nAVISO: O imóvel ID " + id + " não está 'Disponível' (pode estar alugado/vendido), exclusão não permitida!");
+            if (confirmar("Ver lista de imóveis aptos para exclusão? (s/n): ")) mostrarExcluiveis();
             return;
+        }
+        
+        if (confirmar("Confirmar exclusão de '" + p.getNrregistration() + "'? (s/n): ")) {
+            propertyDAO.deleteProperty(id);
+            System.out.println("Imóvel removido!");
         }
     }
 

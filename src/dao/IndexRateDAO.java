@@ -87,4 +87,38 @@ public class IndexRateDAO {
         }
         return null;
     }
+
+    public Index_Rates findById(int id) {
+        String sql = "SELECT * FROM Index_Rates WHERE cdrate = ?";
+        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Index_Rates rate = new Index_Rates();
+                    rate.setCdrate(rs.getInt("cdrate"));
+                    rate.setRefmonth(rs.getInt("refmonth"));
+                    rate.setRefyear(rs.getInt("refyear"));
+                    rate.setVlrate(rs.getDouble("vlrate"));
+                    rate.setFk_Indexes_cdindex(rs.getInt("cdindex"));
+                    return rate;
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return null;
+    }
+
+    public void update(Index_Rates rate) {
+        String sql = "UPDATE Index_Rates SET refmonth=?, refyear=?, vlrate=?, cdindex=? WHERE cdrate=?";
+        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, rate.getRefmonth()); ps.setInt(2, rate.getRefyear()); ps.setDouble(3, rate.getVlrate());
+            ps.setInt(4, rate.getFk_Indexes_cdindex()); ps.setInt(5, rate.getCdrate()); ps.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
+    }
+
+    public boolean delete(int id) {
+        String sql = "DELETE FROM Index_Rates WHERE cdrate = ?";
+        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id); return ps.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
 }

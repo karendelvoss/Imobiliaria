@@ -78,13 +78,6 @@ public String verificarVinculos(int id) {
             ResultSet rs = ps.executeQuery();
             if (rs.next() && rs.getInt(1) > 0) return "CLIENTE COM CONTRATO ATIVO";
         }
-        // Verifica se possui vínculos como corretor
-        String sqlBroker = "SELECT COUNT(*) FROM broker_data WHERE cduser = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sqlBroker)) {
-            ps.setInt(1, id);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next() && rs.getInt(1) > 0) return "CORRETOR COM DADOS VINCULADOS";
-        }
         // Verifica se possui conta bancária
         String sqlBank = "SELECT COUNT(*) FROM bank_accounts WHERE cduser = ?";
         try (PreparedStatement ps = conn.prepareStatement(sqlBank)) {
@@ -159,10 +152,9 @@ public String verificarVinculos(int id) {
             }
 
             if (broker != null && generatedUserId > 0) {
-                String sqlBroker = "INSERT INTO Broker_Data (nrcreci, cduser) VALUES (?, ?)";
+                String sqlBroker = "INSERT INTO Broker_Data (nrcreci) VALUES (?)";
                 try (PreparedStatement stmtB = conn.prepareStatement(sqlBroker)) {
                     stmtB.setString(1, broker.getNrcreci());
-                    stmtB.setInt(2, generatedUserId); 
                     stmtB.executeUpdate();
                 }
             }
@@ -209,7 +201,6 @@ public List<String> getDeletableUsers() {
     String sql = "SELECT cduser, nmuser FROM users " +
                  "WHERE cduser NOT IN (SELECT cduser FROM properties_users) " +
                  "AND cduser NOT IN (SELECT cduser FROM User_Contract) " +
-                 "AND cduser NOT IN (SELECT cduser FROM broker_data) " +
                  "AND cduser NOT IN (SELECT cduser FROM bank_accounts) " +
                  "ORDER BY cduser";
     try (Connection conn = Conexao.getConexao();
