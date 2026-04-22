@@ -137,7 +137,7 @@ public class ContractDAO {
                 if (rs.next()) {
                     Contracts c = new Contracts();
                     c.setCdcontract(rs.getInt("cdcontract"));
-                    c.setDtcreation(rs.getDate("dtcreation").toLocalDate());
+                    if (rs.getDate("dtcreation") != null) c.setDtcreation(rs.getDate("dtcreation").toLocalDate());
                     c.setDstitle(rs.getString("dstitle"));
                     c.setCdtemplate(rs.getInt("cdtemplate"));
                     c.setCdproperty(rs.getInt("cdproperty"));
@@ -236,27 +236,6 @@ public class ContractDAO {
             }
         } catch (SQLException e) { e.printStackTrace(); }
         return false;
-    }
-
-    public Contracts findById(int id) {
-        String sql = "SELECT * FROM Contracts WHERE cdcontract = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    Contracts c = new Contracts();
-                    c.setCdcontract(rs.getInt("cdcontract"));
-                    if (rs.getDate("dtcreation") != null) c.setDtcreation(rs.getDate("dtcreation").toLocalDate());
-                    c.setDstitle(rs.getString("dstitle"));
-                    c.setCdtemplate(rs.getInt("cdtemplate"));
-                    c.setCdproperty(rs.getInt("cdproperty"));
-                    c.setCdindex(rs.getInt("cdindex"));
-                    return c;
-                }
-            }
-        } catch (SQLException e) { e.printStackTrace(); }
-        return null;
     }
 
     public void updateContract(Contracts c) {

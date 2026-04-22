@@ -15,15 +15,16 @@ public class NotificationDAO {
             if (rsMax.next()) proxId = rsMax.getInt("prox_id");
         } catch (SQLException e) { e.printStackTrace(); }
 
-        String sql = "INSERT INTO Notifications (cdnotification, dsmessage, dtsend, fgread, cdcontract, cduser) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO Notifications (cdnotification, dsmessage, dtsend, fgstatus, tpnotification, cdcontract, cduser) VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, proxId);
             ps.setString(2, n.getDsmessage());
             ps.setDate(3, n.getDtsend() != null ? Date.valueOf(n.getDtsend()) : null);
-            ps.setBoolean(4, n.isFgread());
-            ps.setInt(5, n.getCdcontract());
-            ps.setInt(6, n.getCduser());
+            ps.setInt(4, n.getFgstatus());
+            ps.setInt(5, n.getTpnotification());
+            ps.setInt(6, n.getCdcontract());
+            ps.setInt(7, n.getCduser());
             ps.executeUpdate();
             System.out.println("Notificação inserida com sucesso! (ID: " + proxId + ")");
         } catch (SQLException e) {
@@ -44,7 +45,8 @@ public class NotificationDAO {
                     if (rs.getDate("dtsend") != null) {
                         n.setDtsend(rs.getDate("dtsend").toLocalDate());
                     }
-                    n.setFgread(rs.getBoolean("fgread"));
+                    n.setFgstatus(rs.getInt("fgstatus"));
+                    n.setTpnotification(rs.getInt("tpnotification"));
                     n.setCdcontract(rs.getInt("cdcontract"));
                     n.setCduser(rs.getInt("cduser"));
                     return n;
@@ -69,7 +71,8 @@ public class NotificationDAO {
                 if (rs.getDate("dtsend") != null) {
                     n.setDtsend(rs.getDate("dtsend").toLocalDate());
                 }
-                n.setFgread(rs.getBoolean("fgread"));
+                n.setFgstatus(rs.getInt("fgstatus"));
+                n.setTpnotification(rs.getInt("tpnotification"));
                 n.setCdcontract(rs.getInt("cdcontract"));
                 n.setCduser(rs.getInt("cduser"));
                 list.add(n);
@@ -81,15 +84,16 @@ public class NotificationDAO {
     }
 
     public void update(Notifications n) {
-        String sql = "UPDATE Notifications SET dsmessage=?, dtsend=?, fgread=?, cdcontract=?, cduser=? WHERE cdnotification=?";
+        String sql = "UPDATE Notifications SET dsmessage=?, dtsend=?, fgstatus=?, tpnotification=?, cdcontract=?, cduser=? WHERE cdnotification=?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, n.getDsmessage());
             ps.setDate(2, n.getDtsend() != null ? Date.valueOf(n.getDtsend()) : null);
-            ps.setBoolean(3, n.isFgread());
-            ps.setInt(4, n.getCdcontract());
-            ps.setInt(5, n.getCduser());
-            ps.setInt(6, n.getCdnotification());
+            ps.setInt(3, n.getFgstatus());
+            ps.setInt(4, n.getTpnotification());
+            ps.setInt(5, n.getCdcontract());
+            ps.setInt(6, n.getCduser());
+            ps.setInt(7, n.getCdnotification());
             ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();

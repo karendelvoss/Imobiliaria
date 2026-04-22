@@ -1,0 +1,244 @@
+---
+title: Estrutura do Projeto - Sistema Imobiliário
+description: Guia explicativo da organização de pastas e arquivos do projeto.
+---
+
+# Sistema Imobiliário — Guia da Esturtura do Projeto
+
+Este documento descreve, de forma acessível, como o código do projeto está
+organizado, **por que** foi dividido dessa maneira e **onde procurar** cada tipo
+de funcionalidade. Se você nunca mexeu no projeto antes, comece por aqui.
+
+---
+
+## 1. Visão geral
+
+O projeto é um **sistema de gestão para uma imobiliária**, escrito em **Java**,
+com banco de dados **PostgreSQL**. Ele permite cadastrar imóveis, clientes,
+contratos de locação/venda, gerar relatórios e automatizar tarefas como
+reajustes e notificações.
+
+A aplicação roda no **terminal** (modo console): o usuário navega por menus
+numerados para executar cadastros, processos e relatórios.
+
+O código segue uma arquitetura em **camadas**, uma organização clássica em que
+cada pasta tem uma responsabilidade bem definida. Isso evita misturar código
+que acessa banco de dados com código que conversa com o usuário, por exemplo.
+
+---
+
+## 2. Por que separar em camadas?
+
+A separação por pastas (`model`, `dao`, `dto`, `service`, `view`) segue o
+princípio de **"cada coisa no seu lugar"**. Os benefícios são:
+
+- **Facilidade de manutenção:** se um menu está com bug, você sabe que o
+  problema está em `view/`. Se uma consulta SQL está errada, o problema está em
+  `dao/`.
+- **Reutilização:** a mesma lógica de banco pode ser usada por vários menus
+  diferentes sem duplicar código.
+- **Clareza:** uma pessoa nova no projeto consegue entender rapidamente onde
+  cada tipo de código mora.
+
+A ideia geral do fluxo é:
+
+```
+Usuário digita no menu   →   view/   →   service/   →   dao/   →   Banco PostgreSQL
+                                          (usa)      (usa)
+                                         model/    dto/ model/
+```
+
+---
+
+## 3. O que há dentro de `src/`
+
+### 3.1 `src/model/` — Entidades do domínio
+
+Contém as **classes que representam as "coisas" do mundo real** que o sistema
+manipula. Cada classe normalmente corresponde a uma tabela do banco de dados.
+
+Exemplos:
+
+- `Users.java` — representa um usuário (proprietário, locatário, corretor).
+- `Properties.java` — representa um imóvel.
+- `Contracts.java` — representa um contrato.
+- `Installments.java` — parcelas de um contrato.
+- `Addresses.java`, `Cities.java`, `Districts.java`, `Countries.java`,
+  `States.java` — endereços e localização.
+- `Notifications.java`, `NotificationType.java`, `NotificationStatus.java` —
+  avisos/alertas do sistema.
+- `Clauses.java`, `Contract_Templates.java`, `Template_Topics.java`,
+  `Topics.java`, `Variables.java` — peças usadas para montar contratos a partir
+  de modelos.
+- `Indexes.java`, `Index_Rates.java` — índices financeiros (ex.: IGP-M) e suas
+  taxas mensais, usados para reajustar contratos.
+- `Commissions.java`, `Bank_Accounts.java`, `Broker_Data.java` — dados
+  financeiros e de corretores.
+
+> **Onde procurar:** se você precisa saber **quais campos** uma entidade tem
+> (por exemplo: "um imóvel tem metragem? tem status?"), abra a classe
+> correspondente em `src/model/`.
+
+As classes aqui são praticamente só atributos com *getters* e *setters*. Elas
+**não** têm lógica de banco nem de menu.
+
+### 4.2 `src/dao/` — Acesso ao banco de dados
+
+**DAO** significa *Data Access Object*. É a camada que **conversa com o banco
+PostgreSQL**. Cada DAO costuma corresponder a uma entidade de `model/` e
+contém os métodos de persistência: inserir, listar, atualizar, remover e
+consultas específicas.
+
+Exemplos:
+
+- `UserDAO.java`, `PropertyDAO.java`, `ContractDAO.java` — CRUD das entidades
+  principais.
+- `AddressDAO.java`, `CityDAO.java`, `DistrictDAO.java`, `CountryDAO.java` —
+  persistência de localização.
+- `InstallmentDAO.java`, `IndexDAO.java`, `IndexRateDAO.java`,
+  `BankAccountDAO.java` — persistência financeira.
+- `ContractTemplateDAO.java`, `ClauseDAO.java` — modelos contratuais.
+- `NotificationDAO.java`, `RoleDAO.java`, `OccupationDAO.java`,
+  `PropertyTypeDAO.java`, `PropertyPurposeDAO.java`, `PropertyStatusDAO.java` —
+  tabelas de apoio/domínio.
+- `UserContractDAO.java` — relação entre usuários e contratos (ex.: quem é
+  locador, quem é locatário).
+- `Conexao.java` — **classe central de conexão com o PostgreSQL**. Define URL,
+  usuário e senha do banco. **É aqui que você ajusta as credenciais** antes de
+  rodar o sistema.
+- `InstallmentStatus.java` — enum auxiliar de status de parcela (mantido aqui
+  por ser usado diretamente nas consultas).
+
+> **Onde procurar:** se você precisa mexer em **uma consulta SQL**, criar uma
+> busca nova ou investigar um erro de banco, olhe em `src/dao/`.
+
+### 4.3 `src/dto/` — Objetos de Transporte de Dados
+
+**DTO** significa *Data Transfer Object*. São classes criadas especificamente
+para **carregar dados agregados** entre camadas, quando nenhuma entidade de
+`model/` sozinha serve.
+
+Arquivos:
+
+- `AdjustmentReportDTO.java` — empacota o resultado de um relatório de
+  reajustes.
+- `ParticipantDTO.java` — junta informações de um participante de contrato
+  (nome, CPF/CNPJ, papel, percentual, status de assinatura) vindas de várias
+  tabelas.
+
+> **Por que existir separado de `model/`?** Porque um DTO **não é uma tabela
+> do banco**; é uma "embalagem" montada para um caso específico, geralmente
+> relatórios ou telas que combinam dados de várias entidades.
+
+### 4.4 `src/service/` — Regras de negócio
+
+Os serviços abrigam **lógicas mais complexas** que vão além de um simples
+"salvar no banco". Eles orquestram vários DAOs e aplicam regras do negócio
+imobiliário.
+
+Arquivos:
+
+- `FinancialService.java` — cálculos financeiros (ex.: gerar parcelas,
+  atualizar valores).
+- `AutomationService.java` — rotinas automáticas baseadas em tempo, como
+  **aplicar reajustes** de contratos e **gerar notificações**.
+- `ReportService.java` — montagem de relatórios (consolidação de dados vindos
+  de vários DAOs).
+
+> **Onde procurar:** se a dúvida é **"como o sistema calcula X?"** ou **"qual a
+> regra para gerar Y?"**, procure em `src/service/`.
+
+### 4.5 `src/view/` — Interface com o usuário
+
+A camada `view` é responsável por **conversar com quem está usando o sistema**
+(no caso, via terminal). Ela exibe menus, lê entradas do teclado e chama os
+DAOs/Serviços conforme o que o usuário pedir.
+
+Arquivos:
+
+- `Main.java` — **ponto de entrada do programa** (`public static void main`).
+  Monta todas as dependências (DAOs, serviços, views) e inicia o menu
+  principal. É o primeiro arquivo a ser lido se você quer entender como tudo
+  se conecta.
+- `ConsoleIO.java` — utilitário para ler entradas do usuário com segurança
+  (inteiros, textos, datas) tratando erros de digitação.
+- `CrudConsole.java` — base genérica para criar menus CRUD (Criar, Ler,
+  Atualizar, Deletar) reaproveitável.
+- `UserView.java` — menus de usuários.
+- `PropertyView.java` — menus de imóveis.
+- `ContractView.java` — menus de contratos (processos de negócio).
+- `DomainCrudView.java` — menus das tabelas de apoio (países, cidades,
+  bairros, tipos de imóvel, modelos de contrato, cláusulas, índices, papéis,
+  contas bancárias, notificações).
+- `ReportView.java` — menu de relatórios.
+
+> **Onde procurar:** se um **texto de menu** está errado, se um campo está
+> sendo pedido na ordem errada ou se você quer adicionar uma nova opção ao
+> menu, é aqui que se mexe.
+
+---
+
+## 5. Pasta `dist/lib/`
+
+Contém **bibliotecas externas** necessárias para o programa rodar. No
+projeto existe apenas uma:
+
+- `postgresql-42.7.4.jar` — driver JDBC do PostgreSQL. Sem esse arquivo, o
+  Java não consegue falar com o banco.
+
+Ao compilar e executar, o `README.md` indica incluir esse `.jar` no
+*classpath* (`-cp "dist/lib/*"`).
+
+---
+
+## 6. Arquivos na raiz do projeto
+
+Não são código Java, mas compõem o projeto:
+
+- `README.md` — instruções rápidas de compilação e execução.
+- `database/backup.sql` — **dumps do PostgreSQL**
+  contendo a estrutura das tabelas e dados. Servem para recriar o banco do
+  zero.
+- `database/insert.sql` — script separado com **dados de exemplo** para popular
+  as tabelas.
+
+---
+
+## 7. Como a execução começa
+
+1. O usuário executa `java -cp "bin;dist/lib/*" view.Main`.
+2. A JVM chama `main(...)` em `src/view/Main.java`.
+3. `Main` cria todos os DAOs e injeta-os nas views (padrão *Composition
+   Root*).
+4. O menu principal é exibido, com três módulos:
+   - **1. Cadastros (CRUD)** → `UserView`, `PropertyView`, `DomainCrudView`.
+   - **2. Processos de negócio** → `ContractView`.
+   - **3. Relatórios** → `ReportView` + `ReportService`.
+5. Cada escolha aciona uma *view*, que chama os *services/DAOs* necessários,
+   que por sua vez usam `Conexao.getConexao()` para falar com o PostgreSQL.
+
+---
+
+## 8. Guia rápido: "onde eu mexo para..."
+
+| Quero... | Vá em... |
+|---|---|
+| Mudar usuário/senha do banco | `src/dao/Conexao.java` |
+| Adicionar um campo numa entidade | `src/model/<Entidade>.java` **e** `src/dao/<Entidade>DAO.java` |
+| Criar uma consulta SQL nova | `src/dao/` |
+| Mudar um texto de menu | `src/view/` |
+| Alterar regra de cálculo de reajuste | `src/service/AutomationService.java` |
+| Alterar cálculo financeiro | `src/service/FinancialService.java` |
+| Mudar formato de um relatório | `src/service/ReportService.java` + `src/view/ReportView.java` |
+| Entender uma tabela do banco | `Dicionário de dados 2204.xlsx` |
+| Ver relacionamentos do banco | `esquema lógico segundo bd.pgerd.png` |
+| Restaurar o banco do zero | `backupBancoKaren.sql` + `insercaoDados.sql` |
+| Adicionar biblioteca externa | `dist/lib/` |
+
+---
+
+## 9. Em uma frase
+
+> **`model/` descreve o que existe, `dao/` conversa com o banco, `dto/`
+> transporta resultados especiais, `service/` aplica regras de negócio e
+> `view/` conversa com o usuário — e `Main.java` é quem amarra tudo.**
