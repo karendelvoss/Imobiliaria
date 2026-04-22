@@ -15,14 +15,16 @@ public class Main {
     private final ContractView contractView;
     private final DomainCrudView domainView;
     private final ReportView reportView;
+    private final OccupationView occupationView;
 
     public Main(UserView userView, PropertyView propertyView, ContractView contractView,
-                DomainCrudView domainView, ReportView reportView) {
+                DomainCrudView domainView, ReportView reportView, OccupationView occupationView) {
         this.userView = userView;
         this.propertyView = propertyView;
         this.contractView = contractView;
         this.domainView = domainView;
         this.reportView = reportView;
+        this.occupationView = occupationView;
     }
 
     public static void main(String[] args) {
@@ -32,19 +34,26 @@ public class Main {
         ContractDAO contractDAO = new ContractDAO();
         ContractTemplateDAO templateDAO = new ContractTemplateDAO();
         IndexDAO indexDAO = new IndexDAO();
+        OccupationDAO occupationDAO = new OccupationDAO();
+        TopicDAO topicDAO = new TopicDAO();
+        VariableDAO variableDAO = new VariableDAO();
+        CommissionDAO commissionDAO = new CommissionDAO();
+        BrokerDataDAO brokerDataDAO = new BrokerDataDAO();
 
         DomainCrudView domainView = new DomainCrudView(
                 new CountryDAO(), new CityDAO(), new DistrictDAO(),
                 new PropertyTypeDAO(), new PropertyPurposeDAO(), new PropertyStatusDAO(),
                 templateDAO, new ClauseDAO(), indexDAO, new RoleDAO(),
-                new BankAccountDAO(), new NotificationDAO());
+                new BankAccountDAO(), new NotificationDAO(),
+                topicDAO, variableDAO, commissionDAO, brokerDataDAO);
 
         Main app = new Main(
                 new UserView(userDAO),
                 new PropertyView(propertyDAO),
-                new ContractView(contractDAO, propertyDAO, userDAO, templateDAO, indexDAO),
+                new ContractView(contractDAO, propertyDAO, userDAO, templateDAO, indexDAO, topicDAO),
                 domainView,
-                new ReportView(propertyDAO, new ReportService()));
+                new ReportView(propertyDAO, new ReportService()),
+                new OccupationView(occupationDAO));
 
         app.executar();
     }
@@ -80,10 +89,10 @@ public class Main {
             System.out.println("\n--- GESTÃO DE CADASTROS (CRUD) ---");
             System.out.println("1. Usuários");
             System.out.println("2. Imóveis");
-            System.out.println("3. Localização (Países, Cidades, Bairros)");
+            System.out.println("3. Localização (Países, Estados, Cidades, Bairros, Endereços)");
             System.out.println("4. Domínios de Imóveis (Tipos, Finalidades, Status)");
             System.out.println("5. Domínios Contratuais (Modelos, Cláusulas, Índices, Papéis)");
-            System.out.println("6. Outros (Contas Bancárias, Notificações)");
+            System.out.println("6. Outros (Profissões, Contas Bancárias, Notificações)");
             System.out.println("0. Voltar ao Menu Principal");
             op = ConsoleIO.lerIntSeguro("Escolha: ");
             switch (op) {
@@ -92,7 +101,14 @@ public class Main {
                 case 3: domainView.menuLocalizacao(); break;
                 case 4: domainView.menuAtributosImoveis(); break;
                 case 5: domainView.menuAtributosContratuais(); break;
-                case 6: domainView.menuOutros(); break;
+                case 6:
+                    System.out.println("\n--- 6. OUTROS DOMÍNIOS ---");
+                    System.out.println("1. Profissões");
+                    System.out.println("2. Contas Bancárias e Notificações");
+                    int subOp = ConsoleIO.lerIntSeguro("Escolha: ");
+                    if (subOp == 1) occupationView.menu();
+                    else if (subOp == 2) domainView.menuOutros();
+                    break;
                 case 0: break;
                 default: System.out.println("Opção inválida!");
             }

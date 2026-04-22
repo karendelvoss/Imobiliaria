@@ -101,4 +101,17 @@ public class ContractTemplateDAO {
             return false;
         }
     }
+
+    public void linkTopic(int idTemplate, int idTopic) {
+        String sql = "INSERT INTO Template_Topics (cdtemplate, cdtopic) VALUES (?, ?)";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idTemplate);
+            ps.setInt(2, idTopic);
+            ps.executeUpdate();
+            System.out.println("Tópico vinculado ao modelo com sucesso!");
+        } catch (SQLException e) {
+            System.err.println("Erro ao vincular tópico (pode já estar vinculado): " + e.getMessage());
+        }
+    }
 }

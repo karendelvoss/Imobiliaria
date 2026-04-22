@@ -72,7 +72,7 @@ public String verificarVinculos(int id) {
             if (rs.next() && rs.getInt(1) > 0) return "PROPRIETÁRIO VINCULADO A IMÓVEL";
         }
         // Verifica se tem contrato (como locatário/comprador)
-        String sqlCont = "SELECT COUNT(*) FROM User_Contract_Contracts_Users_Roles WHERE cduser = ?";
+        String sqlCont = "SELECT COUNT(*) FROM User_Contract WHERE cduser = ?";
         try (PreparedStatement ps = conn.prepareStatement(sqlCont)) {
             ps.setInt(1, id);
             ResultSet rs = ps.executeQuery();
@@ -208,7 +208,7 @@ public List<String> getDeletableUsers() {
     // Busca usuários que NÃO estão em properties_users E NÃO estão em user_contract
     String sql = "SELECT cduser, nmuser FROM users " +
                  "WHERE cduser NOT IN (SELECT cduser FROM properties_users) " +
-                 "AND cduser NOT IN (SELECT cduser FROM User_Contract_Contracts_Users_Roles) " +
+                 "AND cduser NOT IN (SELECT cduser FROM User_Contract) " +
                  "AND cduser NOT IN (SELECT cduser FROM broker_data) " +
                  "AND cduser NOT IN (SELECT cduser FROM bank_accounts) " +
                  "ORDER BY cduser";
@@ -218,8 +218,9 @@ public List<String> getDeletableUsers() {
         while (rs.next()) {
             list.add("ID: " + rs.getInt("cduser") + " | Nome: " + rs.getString("nmuser"));
         }
-    } catch (SQLException e) { e.printStackTrace(); }
-    return list;
-}
-
+        } catch (SQLException e) { 
+            e.printStackTrace(); 
+        }
+        return list;
+    }
 }

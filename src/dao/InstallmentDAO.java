@@ -45,7 +45,7 @@ public class InstallmentDAO {
      */
     public List<Installments> findByContractId(int contractId) {
         List<Installments> installments = new ArrayList<>();
-        String sql = "SELECT * FROM Installments WHERE fk_Contracts_cdcontract = ? ORDER BY nrinstallment";
+        String sql = "SELECT * FROM Installments WHERE cdcontract = ? ORDER BY nrinstallment";
         
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -68,7 +68,7 @@ public class InstallmentDAO {
      * @param installment O objeto Installment com os dados atualizados.
      */
     public void update(Installments installment) {
-        String sql = "UPDATE Installments SET dtdue = ?, vlbase = ?, vladjusted = ?, cdstatus = ?, dtpayment = ?, dtlastadjustment = ? WHERE cdinstallment = ?";
+        String sql = "UPDATE Installments SET dtdue = ?, vlbase = ?, vladjusted = ?, cdstatus = ?, dtpayment = ? WHERE cdinstallment = ?";
         
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -78,8 +78,7 @@ public class InstallmentDAO {
             ps.setDouble(3, installment.getVladjusted());
             ps.setInt(4, installment.getCdstatus());
             ps.setDate(5, installment.getDtpayment() != null ? Date.valueOf(installment.getDtpayment()) : null);
-            ps.setDate(6, installment.getDtlastadjustment() != null ? Date.valueOf(installment.getDtlastadjustment()) : null);
-            ps.setInt(7, installment.getCdinstallment());
+            ps.setInt(6, installment.getCdinstallment());
             
             ps.executeUpdate();
         } catch (SQLException e) {
@@ -100,8 +99,7 @@ public class InstallmentDAO {
         inst.setCdstatus(rs.getInt("cdstatus"));
         inst.setDtpayment(rs.getDate("dtpayment") != null ? rs.getDate("dtpayment").toLocalDate() : null);
         inst.setNrinstallment(rs.getInt("nrinstallment"));
-        inst.setDtlastadjustment(rs.getDate("dtlastadjustment") != null ? rs.getDate("dtlastadjustment").toLocalDate() : null);
-        inst.setFk_Contracts_cdcontract(rs.getInt("fk_Contracts_cdcontract"));
+        inst.setFk_Contracts_cdcontract(rs.getInt("cdcontract"));
         return inst;
     }
 
@@ -112,7 +110,7 @@ public class InstallmentDAO {
      */
     public Installments findLastPendingInstallmentByContractId(int contractId) {
         String sql = "SELECT * FROM Installments " +
-                     "WHERE fk_Contracts_cdcontract = ? AND cdstatus = 1 " + // 1 = Pendente
+                     "WHERE cdcontract = ? AND cdstatus = 1 " + // 1 = Pendente
                      "ORDER BY nrinstallment DESC LIMIT 1";
         
         try (Connection conn = Conexao.getConexao();

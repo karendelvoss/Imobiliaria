@@ -5,6 +5,10 @@ import dao.CityDAO;
 import dao.ClauseDAO;
 import dao.ContractTemplateDAO;
 import dao.CountryDAO;
+import dao.TopicDAO;
+import dao.VariableDAO;
+import dao.CommissionDAO;
+import dao.BrokerDataDAO;
 import dao.DistrictDAO;
 import dao.IndexDAO;
 import dao.NotificationDAO;
@@ -24,6 +28,10 @@ import model.Property_Purposes;
 import model.Property_Status;
 import model.Property_Types;
 import model.Roles;
+import model.Topics;
+import model.Variables;
+import model.Commissions;
+import model.Broker_Data;
 
 import java.time.LocalDate;
 
@@ -47,12 +55,18 @@ public class DomainCrudView {
     private final RoleDAO roleDAO;
     private final BankAccountDAO bankAccountDAO;
     private final NotificationDAO notificationDAO;
+    private final TopicDAO topicDAO;
+    private final VariableDAO variableDAO;
+    private final CommissionDAO commissionDAO;
+    private final BrokerDataDAO brokerDataDAO;
 
     public DomainCrudView(CountryDAO countryDAO, CityDAO cityDAO, DistrictDAO districtDAO,
                           PropertyTypeDAO propertyTypeDAO, PropertyPurposeDAO propertyPurposeDAO,
                           PropertyStatusDAO propertyStatusDAO, ContractTemplateDAO templateDAO,
                           ClauseDAO clauseDAO, IndexDAO indexDAO, RoleDAO roleDAO,
-                          BankAccountDAO bankAccountDAO, NotificationDAO notificationDAO) {
+                          BankAccountDAO bankAccountDAO, NotificationDAO notificationDAO,
+                          TopicDAO topicDAO, VariableDAO variableDAO, 
+                          CommissionDAO commissionDAO, BrokerDataDAO brokerDataDAO) {
         this.countryDAO = countryDAO;
         this.cityDAO = cityDAO;
         this.districtDAO = districtDAO;
@@ -65,6 +79,10 @@ public class DomainCrudView {
         this.roleDAO = roleDAO;
         this.bankAccountDAO = bankAccountDAO;
         this.notificationDAO = notificationDAO;
+        this.topicDAO = topicDAO;
+        this.variableDAO = variableDAO;
+        this.commissionDAO = commissionDAO;
+        this.brokerDataDAO = brokerDataDAO;
     }
 
     // --- Submenus ---
@@ -91,12 +109,17 @@ public class DomainCrudView {
 
     public void menuAtributosContratuais() {
         System.out.println("\n--- DOMÍNIOS CONTRATUAIS ---");
-        System.out.println("1. Modelos (Templates)  2. Cláusulas  3. Índices  4. Papéis  0. Voltar");
+        System.out.println("1. Modelos (Templates)  2. Cláusulas  3. Índices  4. Papéis");
+        System.out.println("5. Tópicos  6. Variáveis  7. Comissões  8. Corretores  0. Voltar");
         switch (lerIntSeguro("Escolha: ")) {
             case 1: crudContractTemplate(); break;
             case 2: crudClause(); break;
             case 3: crudIndex(); break;
             case 4: crudRole(); break;
+            case 5: crudTopic(); break;
+            case 6: crudVariable(); break;
+            case 7: crudCommission(); break;
+            case 8: crudBrokerData(); break;
         }
     }
 
@@ -285,5 +308,77 @@ public class DomainCrudView {
                 notificationDAO::findById,
                 n -> n.getCdnotification() + " - " + n.getDtsend() + " | Status: " + n.getFgstatus() + " | Msg: " + n.getDsmessage(),
                 CrudConsole.adapt(notificationDAO::insert, notificationDAO::update, notificationDAO::delete, notificationDAO::listAll));
+    }
+
+    private void crudTopic() {
+        CrudConsole.run("Tópicos de Contrato",
+                () -> { Topics t = new Topics(); t.setNmtopic(ler("Nome do Tópico: ")); return t; },
+                t -> t.setNmtopic(lerOuManter("Nome do Tópico", t.getNmtopic())),
+                topicDAO::findById,
+                t -> t.getCdtopic() + " - " + t.getNmtopic(),
+                CrudConsole.adapt(topicDAO::insert, topicDAO::update, topicDAO::delete, topicDAO::listAll));
+    }
+
+    private void crudVariable() {
+        CrudConsole.run("Variáveis do Contrato",
+                () -> {
+                    Variables v = new Variables();
+                    v.setNmvariable(ler("Nome: "));
+                    v.setVlvariable(ler("Valor: "));
+                    v.setTpvariable(ler("Tipo (Texto, Moeda, Data): "));
+                    v.setFgtriggeralert(confirmar("Gera Alerta? (s/n): "));
+                    v.setCdcontract(lerInt("ID Contrato: "));
+                    return v;
+                },
+                v -> {
+                    v.setNmvariable(lerOuManter("Nome", v.getNmvariable()));
+                    v.setVlvariable(lerOuManter("Valor", v.getVlvariable()));
+                    v.setTpvariable(lerOuManter("Tipo", v.getTpvariable()));
+                    v.setFgtriggeralert(confirmar("Gera Alerta? (s/n): "));
+                    v.setCdcontract(lerIntOuManter("ID Contrato", v.getCdcontract()));
+                },
+                variableDAO::findById,
+                v -> v.getCdvariable() + " - " + v.getNmvariable() + ": " + v.getVlvariable(),
+                CrudConsole.adapt(variableDAO::insert, variableDAO::update, variableDAO::delete, variableDAO::listAll));
+    }
+
+    private void crudCommission() {
+        CrudConsole.run("Comissões",
+                () -> {
+                    Commissions c = new Commissions();
+                    c.setVlcommission(lerDouble("Valor (0.0): "));
+                    String d = ler("Data Pagamento (AAAA-MM-DD) ou deixe vazio: ");
+                    if (!d.isEmpty()) c.setDtpayment(LocalDate.parse(d));
+                    c.setCdcontract(lerInt("ID Contrato: "));
+                    return c;
+                },
+                c -> {
+                    try {
+                        c.setVlcommission(Double.parseDouble(lerOuManter("Valor Atual", String.valueOf(c.getVlcommission()))));
+                    } catch (Exception e) { /* mantem */ }
+                    String d = ler("Data Pagamento (" + c.getDtpayment() + "): ");
+                    if (!d.isEmpty()) c.setDtpayment(LocalDate.parse(d));
+                    c.setCdcontract(lerIntOuManter("ID Contrato", c.getCdcontract()));
+                },
+                commissionDAO::findById,
+                c -> c.getCdcommission() + " - R$" + c.getVlcommission() + " (Contrato: " + c.getCdcontract() + ")",
+                CrudConsole.adapt(commissionDAO::insert, commissionDAO::update, commissionDAO::delete, commissionDAO::listAll));
+    }
+
+    private void crudBrokerData() {
+        CrudConsole.run("Dados de Corretores",
+                () -> {
+                    Broker_Data b = new Broker_Data();
+                    b.setNrcreci(ler("CRECI: "));
+                    b.setCduser(lerInt("ID Usuário: "));
+                    return b;
+                },
+                b -> {
+                    b.setNrcreci(lerOuManter("CRECI", b.getNrcreci()));
+                    System.out.println("ID Usuário não pode ser alterado.");
+                },
+                brokerDataDAO::findById, // findById vai usar o cduser
+                b -> "User ID: " + b.getCduser() + " - CRECI: " + b.getNrcreci(),
+                CrudConsole.adapt(brokerDataDAO::insert, brokerDataDAO::update, brokerDataDAO::delete, brokerDataDAO::listAll));
     }
 }

@@ -37,14 +37,12 @@ public class ContractDAO {
             }
 
             // 2. Vincula os Participantes (Locatário, Proprietário, etc.)
-            String sqlParticipants = "INSERT INTO User_Contract_Contracts_Users_Roles (cdcontract, cduser, cdrole, vlparticipation, fgsignaturestatus) VALUES (?, ?, ?, ?, ?)";
+            String sqlParticipants = "INSERT INTO User_Contract (cdcontract, cduser, cdrole) VALUES (?, ?, ?)";
             try (PreparedStatement stmtP = conn.prepareStatement(sqlParticipants)) {
                 for (User_Contract part : participants) {
                     stmtP.setInt(1, generatedContractId);
                     stmtP.setInt(2, part.getCduser());
                     stmtP.setInt(3, part.getCdrole());
-                    stmtP.setDouble(4, part.getVlparticipation());
-                    stmtP.setInt(5, part.getFgsignaturestatus());
                     stmtP.addBatch();
                 }
                 stmtP.executeBatch();
@@ -58,7 +56,7 @@ public class ContractDAO {
                 if (rsMaxInst.next()) generatedInstallmentId = rsMaxInst.getInt(1);
             }
 
-            String sqlInstallments = "INSERT INTO Installments (cdinstallment, dtdue, vlbase, cdstatus, nrinstallment, fk_contracts_cdcontract) VALUES (?, ?, ?, ?, ?, ?)";
+            String sqlInstallments = "INSERT INTO Installments (cdinstallment, dtdue, vlbase, cdstatus, nrinstallment, cdcontract) VALUES (?, ?, ?, ?, ?, ?)";
             try (PreparedStatement stmtI = conn.prepareStatement(sqlInstallments)) {
                 for (Installments inst : installments) {
                     generatedInstallmentId++;
@@ -108,18 +106,47 @@ public class ContractDAO {
     }
 
     /**
-     * Auxilia o usuário no Main a encontrar IDs válidos de contratos.
+     * Retorna todos os contratos sem filtro (mantém compatibilidade com ContractView).
      */
     public List<String> getActiveContractsList() {
+        return getActiveContractsList("geral");
+    }
+
+    /**
+     * Auxilia o usuário a encontrar IDs válidos de contratos, filtrando por tipo (venda/locação/geral).
+     * A diferenciação é feita pelo propósito do imóvel atrelado ao contrato.
+     */
+    public List<String> getActiveContractsList(String tipo) {
         List<String> list = new ArrayList<>();
-        String sql = "SELECT cdcontract, dstitle FROM contracts ORDER BY cdcontract";
+        boolean isGeral = tipo == null || "geral".equalsIgnoreCase(tipo);
+
+        StringBuilder sqlBuilder = new StringBuilder("SELECT DISTINCT c.cdcontract, c.dstitle FROM Contracts c ");
+
+        if (!isGeral) {
+            sqlBuilder.append("JOIN Properties p ON c.cdproperty = p.cdproperty ")
+                      .append("JOIN Property_Status ps ON p.cdstatus = ps.cdstatus ")
+                      .append("WHERE ps.nmstatus ILIKE ? OR ps.nmstatus ILIKE ? ");
+        }
+
+        sqlBuilder.append("ORDER BY c.cdcontract");
         
         try (Connection conn = Conexao.getConexao(); 
-             PreparedStatement stmt = conn.prepareStatement(sql);
-             ResultSet rs = stmt.executeQuery()) {
+             PreparedStatement stmt = conn.prepareStatement(sqlBuilder.toString())) {
             
-            while (rs.next()) {
-                list.add("ID: " + rs.getInt("cdcontract") + " - " + rs.getString("dstitle"));
+            if (!isGeral) {
+                if (tipo.equalsIgnoreCase("venda")) {
+                    stmt.setString(1, "%vend%");   // Pega "Vendido", "Venda"
+                    stmt.setString(2, "%venda%");
+                } else {
+                    stmt.setString(1, "%alugad%"); // Pega "Alugado"
+                    stmt.setString(2, "%loca%");   // Pega "Locação", "Locado"
+                }
+            }
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    list.add("ID: " + rs.getInt("cdcontract") + " - " + rs.getString("dstitle"));
+                }
             }
         } catch (SQLException e) {
             System.err.println("Erro ao listar contratos: " + e.getMessage());
@@ -186,9 +213,9 @@ public class ContractDAO {
      */
    public boolean gerarExtrato(int idContract) {
     String sql = "SELECT c.dstitle, i.nrinstallment, i.dtdue, i.vlbase, idx.nmindex " +
-                 "FROM Contracts c " +
-                 "JOIN Installments i ON c.cdcontract = i.fk_contracts_cdcontract " +
-                 "JOIN Indexes idx ON c.cdindex = idx.cdindex " +
+                 "FROM Contracts c " + 
+                 "LEFT JOIN Installments i ON c.cdcontract = i.cdcontract " +
+                 "LEFT JOIN Indexes idx ON c.cdindex = idx.cdindex " +
                  "WHERE c.cdcontract = ? ORDER BY i.nrinstallment";
 
     try (Connection conn = Conexao.getConexao();
@@ -259,8 +286,8 @@ public class ContractDAO {
             conn = Conexao.getConexao();
             conn.setAutoCommit(false); // Inicia transação
             // Exclui dependências manualmente para evitar erro de FK Constraints
-            conn.createStatement().executeUpdate("DELETE FROM Installments WHERE fk_contracts_cdcontract = " + id);
-            conn.createStatement().executeUpdate("DELETE FROM User_Contract_Contracts_Users_Roles WHERE cdcontract = " + id);
+            conn.createStatement().executeUpdate("DELETE FROM Installments WHERE cdcontract = " + id);
+            conn.createStatement().executeUpdate("DELETE FROM User_Contract WHERE cdcontract = " + id);
             conn.createStatement().executeUpdate("DELETE FROM Commissions WHERE cdcontract = " + id);
             conn.createStatement().executeUpdate("DELETE FROM Notifications WHERE cdcontract = " + id);
             conn.createStatement().executeUpdate("DELETE FROM Variables WHERE cdcontract = " + id);

@@ -1,8 +1,14 @@
 package view;
 
 import dao.UserDAO;
+import dao.Conexao;
 import model.Users;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -35,11 +41,47 @@ public class UserView {
     private void cadastrar() {
         Users u = new Users();
         u.setNmuser(ler("Nome: "));
-        u.setDocument(ler("Doc: "));
-        u.setNrcellphone(ler("Celular: "));
-        u.setDtbirth(LocalDate.parse(ler("Data Nasc (AAAA-MM-DD): ")));
-        u.setCdaddress(lerInt("ID Endereço: "));
-        u.setCdoccupation(lerInt("ID Profissão: "));
+        
+        while (true) {
+            String doc = ler("Doc (Apenas 11 números): ");
+            if (doc.matches("\\d{11}")) {
+                u.setDocument(doc);
+                break;
+            }
+            System.out.println("ERRO: O documento deve conter exatamente 11 números!");
+        }
+        
+        while (true) {
+            String cel = ler("Celular (Ex: 11 98888-7777 ou 011 8888-7777): ");
+            if (cel.matches("\\d{2,3} \\d{4,5}-\\d{4}")) {
+                u.setNrcellphone(cel);
+                break;
+            }
+            System.out.println("ERRO: Formato de celular inválido. Siga o exemplo com DDD, espaço e traço.");
+        }
+        
+        while (true) {
+            String dataStr = ler("Data Nasc (AAAA-MM-DD ou AAAA/MM/DD): ");
+            try {
+                u.setDtbirth(LocalDate.parse(dataStr.replace("/", "-")));
+                break;
+            } catch (Exception e) {
+                System.out.println("ERRO: Data inválida! Use o formato AAAA-MM-DD ou AAAA/MM/DD (Ex: 1990-12-31).");
+            }
+        }
+        
+        int idAdd = lerIdValido("ID Endereço (0 para cancelar)", 
+                id -> checkAddressExists(id) ? id : null, 
+                this::listAddresses);
+        if (idAdd == -1) return;
+        u.setCdaddress(idAdd);
+
+        int idOcc = lerIdValido("ID Profissão (0 para cancelar)", 
+                id -> checkOccupationExists(id) ? id : null, 
+                this::listOccupations);
+        if (idOcc == -1) return;
+        u.setCdoccupation(idOcc);
+        
         userDAO.saveUser(u, null);
     }
 
@@ -82,13 +124,46 @@ public class UserView {
             }
             System.out.println("Pressione ENTER para manter o valor atual.");
             u.setNmuser(lerOuManter("Nome", u.getNmuser()));
-            u.setDocument(lerOuManter("Documento", u.getDocument()));
+            
+            while (true) {
+                String doc = lerOuManter("Documento", u.getDocument());
+                if (doc.matches("\\d{11}")) {
+                    u.setDocument(doc);
+                    break;
+                }
+                System.out.println("ERRO: O documento deve conter exatamente 11 números!");
+            }
+            
             u.setFgdocument(lerIntOuManter("Tipo Documento", u.getFgdocument()));
-            u.setNrcellphone(lerOuManter("Celular", u.getNrcellphone()));
-            String data = ler("Data Nasc (" + u.getDtbirth() + "): ");
-            if (!data.isEmpty()) u.setDtbirth(LocalDate.parse(data));
-            u.setCdaddress(lerIntOuManter("ID Endereço", u.getCdaddress()));
-            u.setCdoccupation(lerIntOuManter("ID Profissão", u.getCdoccupation()));
+            
+            while (true) {
+                String cel = lerOuManter("Celular", u.getNrcellphone());
+                if (cel.matches("\\d{2,3} \\d{4,5}-\\d{4}")) {
+                    u.setNrcellphone(cel);
+                    break;
+                }
+                System.out.println("ERRO: Formato de celular inválido. Siga o exemplo com DDD, espaço e traço.");
+            }
+            
+            while (true) {
+                String data = ler("Data Nasc (" + u.getDtbirth() + "): ");
+                if (data.isEmpty()) break;
+                try {
+                    u.setDtbirth(LocalDate.parse(data.replace("/", "-")));
+                    break;
+                } catch (Exception e) {
+                    System.out.println("ERRO: Data inválida! Use o formato AAAA-MM-DD ou AAAA/MM/DD (Ex: 1990-12-31).");
+                }
+            }
+            
+            u.setCdaddress(lerIdOuManter("ID Endereço", u.getCdaddress(),
+                    id -> checkAddressExists(id) ? id : null,
+                    this::listAddresses));
+                    
+            u.setCdoccupation(lerIdOuManter("ID Profissão", u.getCdoccupation(),
+                    id -> checkOccupationExists(id) ? id : null,
+                    this::listOccupations));
+                    
             userDAO.update(u);
             System.out.println("Usuário atualizado com sucesso!");
             return;
@@ -130,5 +205,51 @@ public class UserView {
             System.out.println("\n--- USUÁRIOS SEM VÍNCULOS (APTOS PARA EXCLUSÃO) ---");
             aptos.forEach(System.out::println);
         }
+    }
+
+    private boolean checkAddressExists(int id) {
+        String sql = "SELECT 1 FROM Addresses WHERE cdaddress = ?";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) { return false; }
+    }
+
+    private void listAddresses() {
+        String sql = "SELECT cdaddress, nmstreet, nraddress FROM Addresses ORDER BY cdaddress";
+        System.out.println("\n--- ENDEREÇOS DISPONÍVEIS ---");
+        try (Connection conn = Conexao.getConexao();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                System.out.println("ID: " + rs.getInt("cdaddress") + " | " + rs.getString("nmstreet") + ", " + rs.getString("nraddress"));
+            }
+        } catch (SQLException e) { System.out.println("Erro ao buscar endereços."); }
+    }
+
+    private boolean checkOccupationExists(int id) {
+        String sql = "SELECT 1 FROM Occupations WHERE cdoccupation = ?";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) { return false; }
+    }
+
+    private void listOccupations() {
+        String sql = "SELECT cdoccupation, nmoccupation FROM Occupations ORDER BY cdoccupation";
+        System.out.println("\n--- PROFISSÕES DISPONÍVEIS ---");
+        try (Connection conn = Conexao.getConexao();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                System.out.println("ID: " + rs.getInt("cdoccupation") + " | " + rs.getString("nmoccupation"));
+            }
+        } catch (SQLException e) { System.out.println("Erro ao buscar profissões."); }
     }
 }

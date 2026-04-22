@@ -4,6 +4,7 @@ import dao.ContractDAO;
 import dao.ContractTemplateDAO;
 import dao.IndexDAO;
 import dao.PropertyDAO;
+import dao.TopicDAO;
 import dao.UserDAO;
 import model.Contracts;
 import model.Installments;
@@ -25,14 +26,16 @@ public class ContractView {
     private final UserDAO userDAO;
     private final ContractTemplateDAO templateDAO;
     private final IndexDAO indexDAO;
+    private final TopicDAO topicDAO;
 
     public ContractView(ContractDAO contractDAO, PropertyDAO propertyDAO, UserDAO userDAO,
-                        ContractTemplateDAO templateDAO, IndexDAO indexDAO) {
+                        ContractTemplateDAO templateDAO, IndexDAO indexDAO, TopicDAO topicDAO) {
         this.contractDAO = contractDAO;
         this.propertyDAO = propertyDAO;
         this.userDAO = userDAO;
         this.templateDAO = templateDAO;
         this.indexDAO = indexDAO;
+        this.topicDAO = topicDAO;
     }
 
     public void menu() {
@@ -42,12 +45,14 @@ public class ContractView {
         System.out.println("3. DESVINCULAR PROPRIETÁRIO DE IMÓVEL");
         System.out.println("4. ALTERAR CONTRATO");
         System.out.println("5. EXCLUIR CONTRATO");
+        System.out.println("6. ESTRUTURAR MODELO DE CONTRATO (VINCULAR TÓPICOS)");
         switch (lerIntSeguro("Escolha: ")) {
             case 1: realizar(); break;
             case 2: vincularDono(); break;
             case 3: desvincularDono(); break;
             case 4: alterar(); break;
             case 5: excluir(); break;
+            case 6: estruturarModelo(); break;
         }
     }
 
@@ -57,7 +62,7 @@ public class ContractView {
         int idP = lerIdValido("ID Imóvel (apenas disponíveis)",
                 id -> {
                     Properties p = propertyDAO.findById(id);
-                    return (p != null && p.getCdstatus() == 1) ? p : null;
+                    return (p != null && p.getCdstatus() == 2) ? p : null;
                 },
                 () -> propertyDAO.getAvailableOnly().forEach(System.out::println));
         if (idP == -1) return;
@@ -96,7 +101,7 @@ public class ContractView {
         List<Installments> parcelas = coletarParcelas(tipoNegocio);
         List<User_Contract> partes = montarPartes(idP, idU, tipoNegocio);
 
-        int novoStatus = (tipoNegocio == 1) ? 2 : 3; // 2=Alugado, 3=Vendido
+        int novoStatus = (tipoNegocio == 1) ? 1 : 3; // 1=Alugado, 2=Disponível, 3=Vendido
         contractDAO.processFullContract(c, partes, parcelas, null, novoStatus);
     }
 
@@ -226,9 +231,31 @@ public class ContractView {
         }
         if (contractDAO.deleteContract(idC)) {
             System.out.println("Contrato excluído com sucesso!");
-            if (confirmar("Voltar status do Imóvel ID " + c.getCdproperty() + " para 'Disponível' (1)? (s/n): ")) {
+            if (confirmar("Voltar status do Imóvel ID " + c.getCdproperty() + " para 'Disponível' (2)? (s/n): ")) {
                 Properties p = propertyDAO.findById(c.getCdproperty());
-                if (p != null) { p.setCdstatus(1); propertyDAO.updateProperty(p); }
+                if (p != null) { p.setCdstatus(2); propertyDAO.updateProperty(p); }
+            }
+        }
+    }
+
+    private void estruturarModelo() {
+        System.out.println("\n--- ESTRUTURAR MODELO DE CONTRATO ---");
+        int idTpl = lerIdValido("ID do Modelo de Contrato",
+                templateDAO::findById,
+                () -> templateDAO.listAll().forEach(
+                        t -> System.out.println("ID: " + t.getCdtemplate() + " | Nome: " + t.getNmtemplate())));
+        if (idTpl == -1) return;
+
+        System.out.println("\n--- Tópicos disponíveis ---");
+        topicDAO.listAll().forEach(t -> System.out.println("ID: " + t.getCdtopic() + " | " + t.getNmtopic()));
+
+        while (true) {
+            int idTopic = lerIntSeguro("\nID do Tópico para vincular (0 para concluir o processo): ");
+            if (idTopic <= 0) break;
+            if (topicDAO.findById(idTopic) == null) {
+                System.out.println("Tópico inválido.");
+            } else {
+                templateDAO.linkTopic(idTpl, idTopic);
             }
         }
     }

@@ -1,7 +1,6 @@
 package dao;
 
 import dto.ParticipantDTO;
-import model.SignatureStatus;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -27,10 +26,8 @@ public class UserContractDAO {
                      "    u.nmuser, " +
                      "    u.document, " +
                      "    r.nmrole, " +
-                     "    uc.vlparticipation, " +
-                     "    u.nrcellphone, " +
-                     "    uc.fgsignaturestatus " +
-                     "FROM User_Contract_Contracts_Users_Roles uc " +
+                     "    u.nrcellphone " +
+                     "FROM User_Contract uc " +
                      "JOIN Users u ON uc.cduser = u.cduser " +
                      "JOIN Roles r ON uc.cdrole = r.cdrole " +
                      "WHERE uc.cdcontract = ?";
@@ -45,9 +42,7 @@ public class UserContractDAO {
                     dto.setNomeRazaoSocial(rs.getString("nmuser"));
                     dto.setCpfCnpj(rs.getString("document"));
                     dto.setPapelRole(rs.getString("nmrole"));
-                    dto.setPercentualParticipacao(rs.getDouble("vlparticipation"));
                     dto.setContatoPrincipal(rs.getString("nrcellphone"));
-                    dto.setStatusAssinatura(SignatureStatus.fromCode(rs.getInt("fgsignaturestatus")).getDescription());
                     participants.add(dto);
                 }
             }

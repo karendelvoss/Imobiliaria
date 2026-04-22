@@ -22,7 +22,7 @@ public class PropertyDAO {
             e.printStackTrace();
         }
 
-        String sql = "INSERT INTO Properties (cdproperty, nrregistration, dsdescription, vltotalarea, cdaddress, cdtype, cdpurpose, cdstatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO Properties (cdproperty, nrregistration, dsdescription, vltotalarea_, cdaddress, cdtype, cdpurpose, cdstatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -40,24 +40,7 @@ public class PropertyDAO {
             System.out.println("Imóvel cadastrado com sucesso! (ID: " + proxId + ")");
             
         } catch (SQLException e) {
-            if (e.getMessage().contains("vltotalarea")) {
-                String sql2 = "INSERT INTO Properties (cdproperty, nrregistration, dsdescription, vltotalarea_, cdaddress, cdtype, cdpurpose, cdstatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-                try (Connection conn2 = Conexao.getConexao();
-                     PreparedStatement ps2 = conn2.prepareStatement(sql2)) {
-                    ps2.setInt(1, proxId);
-                    ps2.setString(2, prop.getNrregistration());
-                    ps2.setString(3, prop.getDsdescription());
-                    ps2.setDouble(4, prop.getVltotalarea());
-                    ps2.setInt(5, prop.getCdaddress());
-                    ps2.setInt(6, prop.getCdtype());
-                    ps2.setInt(7, prop.getCdpurpose());
-                    ps2.setInt(8, prop.getCdstatus());
-                    ps2.executeUpdate();
-                    System.out.println("Imóvel cadastrado com sucesso! (ID: " + proxId + ")");
-                } catch (SQLException ex2) { ex2.printStackTrace(); }
-            } else {
-                e.printStackTrace();
-            }
+            e.printStackTrace();
         }
     }
 
@@ -116,11 +99,8 @@ public class PropertyDAO {
                 Properties p = new Properties();
                 p.setCdproperty(rs.getInt("cdproperty"));
                 p.setNrregistration(rs.getString("nrregistration"));
-                p.setDsdescription(rs.getString("dsdescription"));
-                try { p.setVltotalarea(rs.getDouble("vltotalarea")); } 
-                catch (SQLException ex) { 
-                    try { p.setVltotalarea(rs.getDouble("vltotalarea_")); } catch (SQLException ex2) {} 
-                }
+                p.setDsdescription(rs.getString("dsdescription")); 
+                p.setVltotalarea(rs.getDouble("vltotalarea_"));
                 p.setCdaddress(rs.getInt("cdaddress"));
                 p.setCdtype(rs.getInt("cdtype"));
                 p.setCdpurpose(rs.getInt("cdpurpose"));
@@ -154,7 +134,7 @@ public class PropertyDAO {
     public void updateProperty(Properties prop) {
     // SQL completo com todos os campos da tabela
     String sql = "UPDATE Properties SET nrregistration = ?, dsdescription = ?, " +
-                 "vltotalarea = ?, cdaddress = ?, cdtype = ?, cdpurpose = ?, " +
+                 "vltotalarea_ = ?, cdaddress = ?, cdtype = ?, cdpurpose = ?, " +
                  "cdstatus = ? WHERE cdproperty = ?";
     
     try (Connection conn = Conexao.getConexao();
@@ -173,26 +153,7 @@ public class PropertyDAO {
         System.out.println("Imóvel atualizado com sucesso no banco de dados!");
         
     } catch (SQLException e) {
-        if (e.getMessage().contains("vltotalarea")) {
-            String sql2 = "UPDATE Properties SET nrregistration = ?, dsdescription = ?, " +
-                          "vltotalarea_ = ?, cdaddress = ?, cdtype = ?, cdpurpose = ?, " +
-                          "cdstatus = ? WHERE cdproperty = ?";
-            try (Connection conn2 = Conexao.getConexao();
-                 PreparedStatement ps2 = conn2.prepareStatement(sql2)) {
-                ps2.setString(1, prop.getNrregistration());
-                ps2.setString(2, prop.getDsdescription());
-                ps2.setDouble(3, prop.getVltotalarea());
-                ps2.setInt(4, prop.getCdaddress());
-                ps2.setInt(5, prop.getCdtype());
-                ps2.setInt(6, prop.getCdpurpose());
-                ps2.setInt(7, prop.getCdstatus());
-                ps2.setInt(8, prop.getCdproperty());
-                ps2.executeUpdate();
-                System.out.println("Imóvel atualizado com sucesso no banco de dados!");
-            } catch (SQLException ex2) { System.err.println("Erro ao atualizar imóvel: " + ex2.getMessage()); }
-        } else {
-            System.err.println("Erro ao atualizar imóvel: " + e.getMessage());
-        }
+        System.err.println("Erro ao atualizar imóvel: " + e.getMessage());
     }
 }
 
@@ -265,11 +226,8 @@ public Properties findById(int id) {
                 Properties p = new Properties();
                 p.setCdproperty(rs.getInt("cdproperty"));
                 p.setNrregistration(rs.getString("nrregistration"));
-                p.setDsdescription(rs.getString("dsdescription"));
-                try { p.setVltotalarea(rs.getDouble("vltotalarea")); } 
-                catch (SQLException ex) { 
-                    try { p.setVltotalarea(rs.getDouble("vltotalarea_")); } catch (SQLException ex2) {} 
-                }
+                p.setDsdescription(rs.getString("dsdescription")); 
+                p.setVltotalarea(rs.getDouble("vltotalarea_"));
                 p.setCdaddress(rs.getInt("cdaddress"));
                 p.setCdtype(rs.getInt("cdtype"));
                 p.setCdpurpose(rs.getInt("cdpurpose"));
@@ -299,8 +257,8 @@ public int countOwners(int idProperty) {
 
 public List<String> getAvailableOnly() {
     List<String> list = new ArrayList<>();
-    // Filtramos pelo status 1 (Disponível) conforme seu banco
-    String sql = "SELECT cdproperty, nrregistration, dsdescription FROM properties WHERE cdstatus = 1 ORDER BY cdproperty";
+    // Filtramos pelo status 2 (Disponível) conforme seu banco
+    String sql = "SELECT cdproperty, nrregistration, dsdescription FROM properties WHERE cdstatus = 2 ORDER BY cdproperty";
     try (Connection conn = Conexao.getConexao();
          PreparedStatement stmt = conn.prepareStatement(sql);
          ResultSet rs = stmt.executeQuery()) {
@@ -415,9 +373,7 @@ public String findByIdDetalhado(int id) {
         if (rs.next()) {
             String endereco = rs.getString("nmstreet") + ", nº " + rs.getString("nraddress");
             
-            double area = 0.0;
-            try { area = rs.getDouble("vltotalarea"); } 
-            catch (SQLException ex) { try { area = rs.getDouble("vltotalarea_"); } catch (SQLException ex2) {} }
+            double area = rs.getDouble("vltotalarea_");
 
             return String.format(
                 "\n--- DETALHES DO IMÓVEL ---\n" +
