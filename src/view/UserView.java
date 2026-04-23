@@ -103,7 +103,7 @@ public class UserView {
         System.out.println("========================================");
         System.out.println("ID:            " + u.getCduser());
         System.out.println("Nome:          " + u.getNmuser());
-        System.out.println("Documento:     " + u.getDocument() + " (Tipo: " + u.getFgdocument() + ")");
+        System.out.println("Documento:     " + u.getDocument() + " (CPF: " + (u.isFgdocument() ? "Sim" : "Não") + ")");
         System.out.println("Celular:       " + u.getNrcellphone());
         System.out.println("Nascimento:    " + u.getDtbirth().format(DF_BR));
         System.out.println("ID Endereço:   " + u.getCdaddress());
@@ -134,7 +134,7 @@ public class UserView {
                 System.out.println("ERRO: O documento deve conter exatamente 11 números!");
             }
             
-            u.setFgdocument(lerIntOuManter("Tipo Documento", u.getFgdocument()));
+            u.setFgdocument(confirmar("É CPF? (s/n, atual: " + (u.isFgdocument() ? "Sim" : "Não") + "): "));
             
             while (true) {
                 String cel = lerOuManter("Celular", u.getNrcellphone());

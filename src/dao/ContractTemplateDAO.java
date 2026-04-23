@@ -7,28 +7,17 @@ import java.util.List;
 
 public class ContractTemplateDAO {
     public void insert(Contract_Templates ct) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdtemplate), 0) + 1 AS prox_id FROM Contract_Templates";
-        
+        String sql = "INSERT INTO Contract_Templates (nmtemplate, dsversion, fgactive) VALUES (?, ?, ?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) {
-                proxId = rsMax.getInt("prox_id");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        String sql = "INSERT INTO Contract_Templates (cdtemplate, nmtemplate, dsversion, fgactive) VALUES (?, ?, ?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, ct.getNmtemplate());
-            ps.setString(3, ct.getDsversion());
-            ps.setString(4, ct.getFgactive());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, ct.getNmtemplate());
+            ps.setString(2, ct.getDsversion());
+            ps.setBoolean(3, ct.isFgactive());
             ps.executeUpdate();
-            System.out.println("Modelo de contrato inserido com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) ct.setCdtemplate(keys.getInt(1));
+            }
+            System.out.println("Modelo de contrato inserido com sucesso! (ID: " + ct.getCdtemplate() + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir modelo de contrato: " + e.getMessage());
         }
@@ -45,7 +34,7 @@ public class ContractTemplateDAO {
                     ct.setCdtemplate(rs.getInt("cdtemplate"));
                     ct.setNmtemplate(rs.getString("nmtemplate"));
                     ct.setDsversion(rs.getString("dsversion"));
-                    ct.setFgactive(rs.getString("fgactive"));
+                    ct.setFgactive(rs.getBoolean("fgactive"));
                     return ct;
                 }
             }
@@ -66,7 +55,7 @@ public class ContractTemplateDAO {
                 ct.setCdtemplate(rs.getInt("cdtemplate"));
                 ct.setNmtemplate(rs.getString("nmtemplate"));
                 ct.setDsversion(rs.getString("dsversion"));
-                ct.setFgactive(rs.getString("fgactive"));
+                ct.setFgactive(rs.getBoolean("fgactive"));
                 list.add(ct);
             }
         } catch (SQLException e) {
@@ -81,7 +70,7 @@ public class ContractTemplateDAO {
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, ct.getNmtemplate());
             ps.setString(2, ct.getDsversion());
-            ps.setString(3, ct.getFgactive());
+            ps.setBoolean(3, ct.isFgactive());
             ps.setInt(4, ct.getCdtemplate());
             ps.executeUpdate();
         } catch (SQLException e) {

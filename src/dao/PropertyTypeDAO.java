@@ -7,26 +7,15 @@ import java.util.List;
 
 public class PropertyTypeDAO {
     public void insert(Property_Types pt) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdtype), 0) + 1 AS prox_id FROM Property_Types";
-        
+        String sql = "INSERT INTO Property_Types (nmtype) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) {
-                proxId = rsMax.getInt("prox_id");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        String sql = "INSERT INTO Property_Types (cdtype, nmtype) VALUES (?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, pt.getNmtype());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, pt.getNmtype());
             ps.executeUpdate();
-            System.out.println("Tipo de imóvel inserido com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) pt.setCdtype(keys.getInt(1));
+            }
+            System.out.println("Tipo de imóvel inserido com sucesso! (ID: " + pt.getCdtype() + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir tipo de imóvel: " + e.getMessage());
         }

@@ -7,23 +7,16 @@ import java.util.List;
 
 public class CountryDAO {
     public void insert(Countries c) {
-        // 1. Busca o maior ID no banco e soma 1
-        String sqlMax = "SELECT COALESCE(MAX(cdcountry), 0) + 1 AS prox_id FROM Countries";
-        String sqlInsert = "INSERT INTO Countries (cdcountry, nmcountry, sgcountry) VALUES (?, ?, ?)";
-        
+        String sqlInsert = "INSERT INTO Countries (nmcountry, sgcountry) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sqlMax)) {
-             
-            int nextId = rs.next() ? rs.getInt("prox_id") : 1;
-
-            try (PreparedStatement ps = conn.prepareStatement(sqlInsert)) {
-                ps.setInt(1, nextId);
-                ps.setString(2, c.getNmcountry());
-                ps.setString(3, c.getSgcountry());
-                ps.executeUpdate();
-                System.out.println("País inserido com sucesso! (ID: " + nextId + ")");
+             PreparedStatement ps = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, c.getNmcountry());
+            ps.setString(2, c.getSgcountry());
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) c.setCdcountry(keys.getInt(1));
             }
+            System.out.println("País inserido com sucesso! (ID: " + c.getCdcountry() + ")");
         } catch (SQLException e) {
             e.printStackTrace();
         }

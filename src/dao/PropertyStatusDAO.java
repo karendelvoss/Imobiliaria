@@ -7,26 +7,15 @@ import java.util.List;
 
 public class PropertyStatusDAO {
     public void insert(Property_Status psObj) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdstatus), 0) + 1 AS prox_id FROM Property_Status";
-        
+        String sql = "INSERT INTO Property_Status (nmstatus) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) {
-                proxId = rsMax.getInt("prox_id");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        String sql = "INSERT INTO Property_Status (cdstatus, nmstatus) VALUES (?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, psObj.getNmstatus());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, psObj.getNmstatus());
             ps.executeUpdate();
-            System.out.println("Status de imóvel inserido com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) psObj.setCdstatus(keys.getInt(1));
+            }
+            System.out.println("Status de imóvel inserido com sucesso! (ID: " + psObj.getCdstatus() + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir status: " + e.getMessage());
         }

@@ -8,22 +8,18 @@ import java.util.List;
 public class AddressDAO {
 
     public void insert(Addresses a) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdaddress), 0) + 1 AS prox_id FROM Addresses";
-        try (Connection conn = Conexao.getConexao(); Statement st = conn.createStatement(); ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
-        } catch (SQLException e) { e.printStackTrace(); }
-
-        String sql = "INSERT INTO Addresses (cdaddress, cdzipcode, nmstreet, nraddress, dscomplement, cddistrict) VALUES (?, ?, ?, ?, ?, ?)";
-        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, a.getCdzipcode());
-            ps.setString(3, a.getNmstreet());
-            ps.setString(4, a.getNraddress());
-            ps.setString(5, a.getDscomplement());
-            ps.setInt(6, a.getCddistrict());
+        String sql = "INSERT INTO Addresses (cdzipcode, nmstreet, nraddress, dscomplement, cddistrict) VALUES (?, ?, ?, ?, ?)";
+        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, a.getCdzipcode());
+            ps.setString(2, a.getNmstreet());
+            ps.setString(3, a.getNraddress());
+            ps.setString(4, a.getDscomplement());
+            ps.setInt(5, a.getCddistrict());
             ps.executeUpdate();
-            System.out.println("Endereço inserido com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) a.setCdaddress(keys.getInt(1));
+            }
+            System.out.println("Endereço inserido com sucesso! (ID: " + a.getCdaddress() + ")");
         } catch (SQLException e) { System.err.println("Erro ao inserir endereço: " + e.getMessage()); }
     }
 

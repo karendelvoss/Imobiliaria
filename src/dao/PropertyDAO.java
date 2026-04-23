@@ -9,36 +9,27 @@ public class PropertyDAO {
 
     // 1. Insert a new Property into the database
     public void insertProperty(Properties prop) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdproperty), 0) + 1 AS prox_id FROM Properties";
-        
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) {
-                proxId = rsMax.getInt("prox_id");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        String sql = "INSERT INTO Properties (nrregistration, dsdescription, vltotalarea, cdaddress, cdtype, cdpurpose, cdstatus) VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-        String sql = "INSERT INTO Properties (cdproperty, nrregistration, dsdescription, vltotalarea_, cdaddress, cdtype, cdpurpose, cdstatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
-        
         try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setInt(1, proxId);
-            ps.setString(2, prop.getNrregistration());
-            ps.setString(3, prop.getDsdescription());
-            ps.setDouble(4, prop.getVltotalarea());
-            ps.setInt(5, prop.getCdaddress());
-            ps.setInt(6, prop.getCdtype());
-            ps.setInt(7, prop.getCdpurpose());
-            ps.setInt(8, prop.getCdstatus());
-            
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            ps.setString(1, prop.getNrregistration());
+            ps.setString(2, prop.getDsdescription());
+            ps.setDouble(3, prop.getVltotalarea());
+            ps.setInt(4, prop.getCdaddress());
+            ps.setInt(5, prop.getCdtype());
+            ps.setInt(6, prop.getCdpurpose());
+            ps.setInt(7, prop.getCdstatus());
+
             ps.executeUpdate();
-            System.out.println("Imóvel cadastrado com sucesso! (ID: " + proxId + ")");
-            
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) {
+                    prop.setCdproperty(keys.getInt(1));
+                }
+            }
+            System.out.println("Imóvel cadastrado com sucesso! (ID: " + prop.getCdproperty() + ")");
+
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -100,7 +91,7 @@ public class PropertyDAO {
                 p.setCdproperty(rs.getInt("cdproperty"));
                 p.setNrregistration(rs.getString("nrregistration"));
                 p.setDsdescription(rs.getString("dsdescription")); 
-                p.setVltotalarea(rs.getDouble("vltotalarea_"));
+                p.setVltotalarea(rs.getDouble("vltotalarea"));
                 p.setCdaddress(rs.getInt("cdaddress"));
                 p.setCdtype(rs.getInt("cdtype"));
                 p.setCdpurpose(rs.getInt("cdpurpose"));
@@ -134,7 +125,7 @@ public class PropertyDAO {
     public void updateProperty(Properties prop) {
     // SQL completo com todos os campos da tabela
     String sql = "UPDATE Properties SET nrregistration = ?, dsdescription = ?, " +
-                 "vltotalarea_ = ?, cdaddress = ?, cdtype = ?, cdpurpose = ?, " +
+                 "vltotalarea = ?, cdaddress = ?, cdtype = ?, cdpurpose = ?, " +
                  "cdstatus = ? WHERE cdproperty = ?";
     
     try (Connection conn = Conexao.getConexao();
@@ -227,7 +218,7 @@ public Properties findById(int id) {
                 p.setCdproperty(rs.getInt("cdproperty"));
                 p.setNrregistration(rs.getString("nrregistration"));
                 p.setDsdescription(rs.getString("dsdescription")); 
-                p.setVltotalarea(rs.getDouble("vltotalarea_"));
+                p.setVltotalarea(rs.getDouble("vltotalarea"));
                 p.setCdaddress(rs.getInt("cdaddress"));
                 p.setCdtype(rs.getInt("cdtype"));
                 p.setCdpurpose(rs.getInt("cdpurpose"));
@@ -373,7 +364,7 @@ public String findByIdDetalhado(int id) {
         if (rs.next()) {
             String endereco = rs.getString("nmstreet") + ", nº " + rs.getString("nraddress");
             
-            double area = rs.getDouble("vltotalarea_");
+            double area = rs.getDouble("vltotalarea");
 
             return String.format(
                 "\n--- DETALHES DO IMÓVEL ---\n" +

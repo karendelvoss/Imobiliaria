@@ -7,21 +7,15 @@ import java.util.List;
 
 public class IndexDAO {
     public void insert(Indexes idx) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdindex), 0) + 1 AS prox_id FROM Indexes";
+        String sql = "INSERT INTO Indexes (nmindex) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
-        } catch (SQLException e) { e.printStackTrace(); }
-
-        String sql = "INSERT INTO Indexes (cdindex, nmindex) VALUES (?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, idx.getNmindex());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, idx.getNmindex());
             ps.executeUpdate();
-            System.out.println("Índice inserido com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) idx.setCdindex(keys.getInt(1));
+            }
+            System.out.println("Índice inserido com sucesso! (ID: " + idx.getCdindex() + ")");
         } catch (SQLException e) {
             e.printStackTrace();
         }

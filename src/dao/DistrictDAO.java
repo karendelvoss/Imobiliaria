@@ -7,21 +7,16 @@ import java.util.List;
 
 public class DistrictDAO {
     public void insert(Districts d) {
-        String sqlMax = "SELECT COALESCE(MAX(cddistrict), 0) + 1 AS prox_id FROM Districts";
-        String sqlInsert = "INSERT INTO Districts (cddistrict, nmdistrict, cdcity) VALUES (?, ?, ?)";
+        String sqlInsert = "INSERT INTO Districts (nmdistrict, cdcity) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sqlMax)) {
-             
-            int nextId = rs.next() ? rs.getInt("prox_id") : 1;
-
-            try (PreparedStatement ps = conn.prepareStatement(sqlInsert)) {
-                ps.setInt(1, nextId);
-                ps.setString(2, d.getNmdistrict());
-                ps.setInt(3, d.getCdcity());
-                ps.executeUpdate();
-                System.out.println("Bairro inserido com sucesso! (ID: " + nextId + ")");
+             PreparedStatement ps = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, d.getNmdistrict());
+            ps.setInt(2, d.getCdcity());
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) d.setCddistrict(keys.getInt(1));
             }
+            System.out.println("Bairro inserido com sucesso! (ID: " + d.getCddistrict() + ")");
         } catch (SQLException e) {
             e.printStackTrace();
         }

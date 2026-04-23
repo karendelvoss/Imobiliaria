@@ -4,7 +4,7 @@ public class Contract_Templates {
     private int cdtemplate;    // Primary Key
     private String nmtemplate; // varchar(100)
     private String dsversion;  // varchar(10) - Corrigido de asversion
-    private String fgactive;   // char(1) - Geralmente 'Y' ou 'N'
+    private boolean fgactive;  // indica se o modelo está ativo
 
     // Getters e Setters
     
@@ -26,10 +26,10 @@ public class Contract_Templates {
     public void setDsversion(String dsversion) {
         this.dsversion = dsversion;
     }
-    public String getFgactive() {
+    public boolean isFgactive() {
         return fgactive;
     }
-    public void setFgactive(String fgactive) {
+    public void setFgactive(boolean fgactive) {
         this.fgactive = fgactive;
     }
 }

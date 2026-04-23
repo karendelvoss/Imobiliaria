@@ -7,22 +7,16 @@ import java.util.List;
 
 public class ClauseDAO {
     public void insert(Clauses c) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdclause), 0) + 1 AS prox_id FROM Clauses";
+        String sql = "INSERT INTO Clauses (dstext, cdtopic) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
-        } catch (SQLException e) { e.printStackTrace(); }
-
-        String sql = "INSERT INTO Clauses (cdclause, dstext, cdtopic) VALUES (?, ?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, c.getDstext());
-            ps.setInt(3, c.getCdtopic());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, c.getDstext());
+            ps.setInt(2, c.getCdtopic());
             ps.executeUpdate();
-            System.out.println("Cláusula inserida com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) c.setCdclause(keys.getInt(1));
+            }
+            System.out.println("Cláusula inserida com sucesso! (ID: " + c.getCdclause() + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir cláusula: " + e.getMessage());
         }

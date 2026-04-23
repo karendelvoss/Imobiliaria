@@ -7,25 +7,20 @@ import java.util.List;
 
 public class NotificationDAO {
     public void insert(Notifications n) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdnotification), 0) + 1 AS prox_id FROM Notifications";
+        String sql = "INSERT INTO Notifications (dsmessage, dtsend, fgstatus, tpnotification, cdcontract, cduser) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
-        } catch (SQLException e) { e.printStackTrace(); }
-
-        String sql = "INSERT INTO Notifications (cdnotification, dsmessage, dtsend, fgread, cdcontract, cduser) VALUES (?, ?, ?, ?, ?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, n.getDsmessage());
-            ps.setDate(3, n.getDtsend() != null ? Date.valueOf(n.getDtsend()) : null);
-            ps.setBoolean(4, n.isFgread());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, n.getDsmessage());
+            ps.setDate(2, n.getDtsend() != null ? Date.valueOf(n.getDtsend()) : null);
+            ps.setInt(3, n.getFgstatus());
+            ps.setInt(4, n.getTpnotification());
             ps.setInt(5, n.getCdcontract());
             ps.setInt(6, n.getCduser());
             ps.executeUpdate();
-            System.out.println("Notificação inserida com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) n.setCdnotification(keys.getInt(1));
+            }
+            System.out.println("Notificação inserida com sucesso! (ID: " + n.getCdnotification() + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir notificação: " + e.getMessage());
         }
@@ -44,7 +39,8 @@ public class NotificationDAO {
                     if (rs.getDate("dtsend") != null) {
                         n.setDtsend(rs.getDate("dtsend").toLocalDate());
                     }
-                    n.setFgread(rs.getBoolean("fgread"));
+                    n.setFgstatus(rs.getInt("fgstatus"));
+                    n.setTpnotification(rs.getInt("tpnotification"));
                     n.setCdcontract(rs.getInt("cdcontract"));
                     n.setCduser(rs.getInt("cduser"));
                     return n;
@@ -69,7 +65,8 @@ public class NotificationDAO {
                 if (rs.getDate("dtsend") != null) {
                     n.setDtsend(rs.getDate("dtsend").toLocalDate());
                 }
-                n.setFgread(rs.getBoolean("fgread"));
+                n.setFgstatus(rs.getInt("fgstatus"));
+                n.setTpnotification(rs.getInt("tpnotification"));
                 n.setCdcontract(rs.getInt("cdcontract"));
                 n.setCduser(rs.getInt("cduser"));
                 list.add(n);
@@ -81,15 +78,16 @@ public class NotificationDAO {
     }
 
     public void update(Notifications n) {
-        String sql = "UPDATE Notifications SET dsmessage=?, dtsend=?, fgread=?, cdcontract=?, cduser=? WHERE cdnotification=?";
+        String sql = "UPDATE Notifications SET dsmessage=?, dtsend=?, fgstatus=?, tpnotification=?, cdcontract=?, cduser=? WHERE cdnotification=?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, n.getDsmessage());
             ps.setDate(2, n.getDtsend() != null ? Date.valueOf(n.getDtsend()) : null);
-            ps.setBoolean(3, n.isFgread());
-            ps.setInt(4, n.getCdcontract());
-            ps.setInt(5, n.getCduser());
-            ps.setInt(6, n.getCdnotification());
+            ps.setInt(3, n.getFgstatus());
+            ps.setInt(4, n.getTpnotification());
+            ps.setInt(5, n.getCdcontract());
+            ps.setInt(6, n.getCduser());
+            ps.setInt(7, n.getCdnotification());
             ps.executeUpdate();
         } catch (SQLException e) {
             e.printStackTrace();

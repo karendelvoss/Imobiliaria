@@ -8,19 +8,15 @@ import java.util.List;
 public class OccupationDAO {
 
     public void save(Occupations occ) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdoccupation), 0) + 1 AS prox_id FROM Occupations";
-        try (Connection conn = Conexao.getConexao(); Statement st = conn.createStatement(); ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
-        } catch (SQLException e) { e.printStackTrace(); }
-
-        String sql = "INSERT INTO Occupations (cdoccupation, nmoccupation) VALUES (?, ?)";
+        String sql = "INSERT INTO Occupations (nmoccupation) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, occ.getNmoccupation());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, occ.getNmoccupation());
             ps.executeUpdate();
-            System.out.println("Profissão '" + occ.getNmoccupation() + "' cadastrada com sucesso com o ID: " + proxId);
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) occ.setCdoccupation(keys.getInt(1));
+            }
+            System.out.println("Profissão '" + occ.getNmoccupation() + "' cadastrada com sucesso com o ID: " + occ.getCdoccupation());
         } catch (SQLException e) {
             System.err.println("Erro ao salvar profissão: " + e.getMessage());
         }

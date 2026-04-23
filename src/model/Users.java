@@ -4,7 +4,7 @@ import java.time.LocalDate;
 public class Users {
     private int cduser;           // Primary Key
     private LocalDate dtbirth;    // date
-    private int fgdocument;       // Flag/Tipo de documento
+    private boolean fgdocument;   // Flag documento (true = CPF, false = CNPJ, etc.)
     private String document;      // varchar(20) - ex: CPF ou CNPJ
     private String nmuser;        // varchar(100) - Nome do usuário
     private String nrcellphone;   // varchar(15) - Telefone
@@ -25,10 +25,10 @@ public class Users {
     public void setDtbirth(LocalDate dtbirth) {
         this.dtbirth = dtbirth;
     }
-    public int getFgdocument() {
+    public boolean isFgdocument() {
         return fgdocument;
     }
-    public void setFgdocument(int fgdocument) {
+    public void setFgdocument(boolean fgdocument) {
         this.fgdocument = fgdocument;
     }
     public String getDocument() {

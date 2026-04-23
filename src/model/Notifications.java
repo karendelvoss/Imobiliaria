@@ -8,7 +8,8 @@ public class Notifications {
     private LocalDate dtsend;   // date
     private int cdcontract;     // Foreign Key para Contracts
     private int cduser;         // Foreign Key para Users
-    private boolean fgread;     // Se a notificação foi lida
+    private int fgstatus;       // Status do ciclo de vida (ver NotificationStatus)
+    private int tpnotification; // Tipo de notificação (ver NotificationType)
     // Getters e Setters
     
     public int getCdnotification() {
@@ -41,10 +42,16 @@ public class Notifications {
     public void setCduser(int cduser) {
         this.cduser = cduser;
     }
-    public boolean isFgread() {
-        return fgread;
+    public int getFgstatus() {
+        return fgstatus;
     }
-    public void setFgread(boolean fgread) {
-        this.fgread = fgread;
+    public void setFgstatus(int fgstatus) {
+        this.fgstatus = fgstatus;
+    }
+    public int getTpnotification() {
+        return tpnotification;
+    }
+    public void setTpnotification(int tpnotification) {
+        this.tpnotification = tpnotification;
     }
 }

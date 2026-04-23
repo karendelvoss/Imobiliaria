@@ -7,21 +7,15 @@ import java.util.List;
 
 public class TopicDAO {
     public void insert(Topics t) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdtopic), 0) + 1 AS prox_id FROM Topics";
+        String sql = "INSERT INTO Topics (nmtopic) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
-        } catch (SQLException e) { e.printStackTrace(); }
-
-        String sql = "INSERT INTO Topics (cdtopic, nmtopic) VALUES (?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, t.getNmtopic());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, t.getNmtopic());
             ps.executeUpdate();
-            System.out.println("Tópico inserido com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) t.setCdtopic(keys.getInt(1));
+            }
+            System.out.println("Tópico inserido com sucesso! (ID: " + t.getCdtopic() + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir tópico: " + e.getMessage());
         }

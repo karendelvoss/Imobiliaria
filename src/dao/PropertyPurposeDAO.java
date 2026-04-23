@@ -7,26 +7,15 @@ import java.util.List;
 
 public class PropertyPurposeDAO {
     public void insert(Property_Purposes pp) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdpurpose), 0) + 1 AS prox_id FROM Property_Purposes";
-        
+        String sql = "INSERT INTO Property_Purposes (nmpurpose) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) {
-                proxId = rsMax.getInt("prox_id");
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-
-        String sql = "INSERT INTO Property_Purposes (cdpurpose, nmpurpose) VALUES (?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, pp.getNmpurpose());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, pp.getNmpurpose());
             ps.executeUpdate();
-            System.out.println("Finalidade de imóvel inserida com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) pp.setCdpurpose(keys.getInt(1));
+            }
+            System.out.println("Finalidade de imóvel inserida com sucesso! (ID: " + pp.getCdpurpose() + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir finalidade: " + e.getMessage());
         }

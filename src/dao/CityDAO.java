@@ -7,21 +7,16 @@ import java.util.List;
 
 public class CityDAO {
     public void insert(Cities c) {
-        String sqlMax = "SELECT COALESCE(MAX(cdcity), 0) + 1 AS prox_id FROM Cities";
-        String sqlInsert = "INSERT INTO Cities (cdcity, nmcity, cdstate) VALUES (?, ?, ?)";
+        String sqlInsert = "INSERT INTO Cities (nmcity, cdstate) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sqlMax)) {
-             
-            int nextId = rs.next() ? rs.getInt("prox_id") : 1;
-
-            try (PreparedStatement ps = conn.prepareStatement(sqlInsert)) {
-                ps.setInt(1, nextId);
-                ps.setString(2, c.getNmcity());
-                ps.setInt(3, c.getCdstate());
-                ps.executeUpdate();
-                System.out.println("Cidade inserida com sucesso! (ID: " + nextId + ")");
+             PreparedStatement ps = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, c.getNmcity());
+            ps.setInt(2, c.getCdstate());
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) c.setCdcity(keys.getInt(1));
             }
+            System.out.println("Cidade inserida com sucesso! (ID: " + c.getCdcity() + ")");
         } catch (SQLException e) {
             e.printStackTrace();
         }

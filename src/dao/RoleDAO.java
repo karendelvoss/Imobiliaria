@@ -7,20 +7,15 @@ import java.util.List;
 
 public class RoleDAO {
     public void insert(Roles r) {
-        String sqlMax = "SELECT COALESCE(MAX(cdrole), 0) + 1 AS prox_id FROM Roles";
-        String sqlInsert = "INSERT INTO Roles (cdrole, nmrole) VALUES (?, ?)";
+        String sqlInsert = "INSERT INTO Roles (nmrole) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sqlMax)) {
-             
-            int nextId = rs.next() ? rs.getInt("prox_id") : 1;
-
-            try (PreparedStatement ps = conn.prepareStatement(sqlInsert)) {
-                ps.setInt(1, nextId);
-                ps.setString(2, r.getNmrole());
-                ps.executeUpdate();
-                System.out.println("Papel inserido com sucesso! (ID: " + nextId + ")");
+             PreparedStatement ps = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, r.getNmrole());
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) r.setCdrole(keys.getInt(1));
             }
+            System.out.println("Papel inserido com sucesso! (ID: " + r.getCdrole() + ")");
         } catch (SQLException e) {
             e.printStackTrace();
         }

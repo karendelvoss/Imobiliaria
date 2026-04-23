@@ -273,7 +273,7 @@ public class DomainCrudView {
                     Contract_Templates t = new Contract_Templates();
                     t.setNmtemplate(ler("Nome: "));
                     t.setDsversion(ler("Versão: "));
-                    t.setFgactive(ler("Ativo (S/N): "));
+                    t.setFgactive(confirmar("Ativo? (s/n): "));
                     return t;
                 },
                 t -> {
@@ -281,7 +281,7 @@ public class DomainCrudView {
                     t.setDsversion(lerOuManter("Versão", t.getDsversion()));
                 },
                 templateDAO::findById,
-                t -> t.getCdtemplate() + " - " + t.getNmtemplate() + " [Ver: " + t.getDsversion() + " Ativo: " + t.getFgactive() + "]",
+                t -> t.getCdtemplate() + " - " + t.getNmtemplate() + " [Ver: " + t.getDsversion() + " Ativo: " + (t.isFgactive() ? "Sim" : "Não") + "]",
                 CrudConsole.adapt(templateDAO::insert, templateDAO::update, templateDAO::delete, templateDAO::listAll));
     }
 
@@ -378,7 +378,8 @@ public class DomainCrudView {
                     int idUser = lerIdValido("ID Usuário (0 para cancelar)", userDAO::findById, () -> userDAO.getAllUsersList().forEach(System.out::println));
                     if (idUser <= 0) return null;
                     n.setCduser(idUser);
-                    n.setFgread(confirmar("Foi lida? (s/n): "));
+                    n.setFgstatus(lerInt("Status (1=Agendada, 2=Enviada, 3=Erro): "));
+                    n.setTpnotification(lerInt("Tipo (1=Email, 2=SMS, 3=Push): "));
                     return n;
                 },
                 n -> {
@@ -387,10 +388,11 @@ public class DomainCrudView {
                     if (!d.isEmpty()) n.setDtsend(LocalDate.parse(d));
                     n.setCdcontract(lerIdOuManter("ID Contrato", n.getCdcontract(), contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println)));
                     n.setCduser(lerIdOuManter("ID Usuário", n.getCduser(), userDAO::findById, () -> userDAO.getAllUsersList().forEach(System.out::println)));
-                    n.setFgread(confirmar("Marcar como lida? (s/n): "));
+                    n.setFgstatus(lerIntOuManter("Status (1=Agendada, 2=Enviada, 3=Erro)", n.getFgstatus()));
+                    n.setTpnotification(lerIntOuManter("Tipo (1=Email, 2=SMS, 3=Push)", n.getTpnotification()));
                 },
                 notificationDAO::findById,
-                n -> n.getCdnotification() + " - " + n.getDtsend() + " | Lida: " + (n.isFgread() ? "Sim" : "Não") + " | Msg: " + n.getDsmessage(),
+                n -> n.getCdnotification() + " - " + n.getDtsend() + " | Status: " + model.NotificationStatus.fromCode(n.getFgstatus()).getDescription() + " | Tipo: " + model.NotificationType.fromCode(n.getTpnotification()).getDescription() + " | Msg: " + n.getDsmessage(),
                 CrudConsole.adapt(notificationDAO::insert, notificationDAO::update, notificationDAO::delete, notificationDAO::listAll));
     }
 

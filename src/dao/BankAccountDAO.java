@@ -7,24 +7,18 @@ import java.util.List;
 
 public class BankAccountDAO {
     public void insert(Bank_Accounts ba) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdbankaccount), 0) + 1 AS prox_id FROM Bank_Accounts";
+        String sql = "INSERT INTO Bank_Accounts (nragency, nraccount, nrpixkey, cduser) VALUES (?, ?, ?, ?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
-        } catch (SQLException e) { e.printStackTrace(); }
-
-        String sql = "INSERT INTO Bank_Accounts (cdbankaccount, nragency, nraccount, nrpixkey, cduser) VALUES (?, ?, ?, ?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setString(2, ba.getNragency());
-            ps.setString(3, ba.getNraccount());
-            ps.setString(4, ba.getNrpixkey());
-            ps.setInt(5, ba.getCduser());
+             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, ba.getNragency());
+            ps.setString(2, ba.getNraccount());
+            ps.setString(3, ba.getNrpixkey());
+            ps.setInt(4, ba.getCduser());
             ps.executeUpdate();
-            System.out.println("Conta bancária inserida com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) ba.setCdbankaccount(keys.getInt(1));
+            }
+            System.out.println("Conta bancária inserida com sucesso! (ID: " + ba.getCdbankaccount() + ")");
         } catch (SQLException e) {
             System.err.println("Erro ao inserir conta bancária: " + e.getMessage());
         }

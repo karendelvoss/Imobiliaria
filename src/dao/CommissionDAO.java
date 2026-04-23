@@ -7,20 +7,16 @@ import java.util.List;
 
 public class CommissionDAO {
     public void insert(Commissions c) {
-        int proxId = 1;
-        String sqlMax = "SELECT COALESCE(MAX(cdcommission), 0) + 1 AS prox_id FROM Commissions";
-        try (Connection conn = Conexao.getConexao(); Statement st = conn.createStatement(); ResultSet rsMax = st.executeQuery(sqlMax)) {
-            if (rsMax.next()) proxId = rsMax.getInt("prox_id");
-        } catch (SQLException e) { e.printStackTrace(); }
-
-        String sql = "INSERT INTO Commissions (cdcommission, vlcommission, dtpayment, cdcontract) VALUES (?, ?, ?, ?)";
-        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, proxId);
-            ps.setDouble(2, c.getVlcommission());
-            ps.setDate(3, c.getDtpayment() != null ? Date.valueOf(c.getDtpayment()) : null);
-            ps.setInt(4, c.getCdcontract());
+        String sql = "INSERT INTO Commissions (vlcommission, dtpayment, cdcontract) VALUES (?, ?, ?)";
+        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setDouble(1, c.getVlcommission());
+            ps.setDate(2, c.getDtpayment() != null ? Date.valueOf(c.getDtpayment()) : null);
+            ps.setInt(3, c.getCdcontract());
             ps.executeUpdate();
-            System.out.println("Comissão inserida com sucesso! (ID: " + proxId + ")");
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) c.setCdcommission(keys.getInt(1));
+            }
+            System.out.println("Comissão inserida com sucesso! (ID: " + c.getCdcommission() + ")");
         } catch (SQLException e) { System.err.println("Erro ao inserir comissão: " + e.getMessage()); }
     }
 

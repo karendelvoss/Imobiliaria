@@ -7,22 +7,17 @@ import java.util.List;
 
 public class StateDAO {
     public void insert(States s) {
-        String sqlMax = "SELECT COALESCE(MAX(cdstate), 0) + 1 AS prox_id FROM States";
-        String sqlInsert = "INSERT INTO States (cdstate, nmstate, sgstate, cdcountry) VALUES (?, ?, ?, ?)";
+        String sqlInsert = "INSERT INTO States (nmstate, sgstate, cdcountry) VALUES (?, ?, ?)";
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sqlMax)) {
-             
-            int nextId = rs.next() ? rs.getInt("prox_id") : 1;
-
-            try (PreparedStatement ps = conn.prepareStatement(sqlInsert)) {
-                ps.setInt(1, nextId);
-                ps.setString(2, s.getNmstate());
-                ps.setString(3, s.getSgstate());
-                ps.setInt(4, s.getCdcountry());
-                ps.executeUpdate();
-                System.out.println("Estado inserido com sucesso! (ID: " + nextId + ")");
+             PreparedStatement ps = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setString(1, s.getNmstate());
+            ps.setString(2, s.getSgstate());
+            ps.setInt(3, s.getCdcountry());
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) s.setCdstate(keys.getInt(1));
             }
+            System.out.println("Estado inserido com sucesso! (ID: " + s.getCdstate() + ")");
         } catch (SQLException e) {
             e.printStackTrace();
         }

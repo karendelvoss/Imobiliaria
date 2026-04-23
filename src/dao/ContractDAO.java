@@ -18,22 +18,22 @@ public class ContractDAO {
             conn.setAutoCommit(false); // Inicia a transação (ACID)
 
             int generatedContractId = 0;
-            String sqlMax = "SELECT COALESCE(MAX(cdcontract), 0) + 1 AS prox_id FROM Contracts";
-            try (Statement st = conn.createStatement();
-                 ResultSet rsMax = st.executeQuery(sqlMax)) {
-                if (rsMax.next()) generatedContractId = rsMax.getInt("prox_id");
-            }
 
             // 1. Salva o Contrato principal e recupera o ID gerado
-            String sqlContract = "INSERT INTO Contracts (cdcontract, dtcreation, dstitle, cdtemplate, cdproperty, cdindex) VALUES (?, ?, ?, ?, ?, ?)";
-            try (PreparedStatement stmtC = conn.prepareStatement(sqlContract)) {
-                stmtC.setInt(1, generatedContractId);
-                stmtC.setDate(2, Date.valueOf(contract.getDtcreation()));
-                stmtC.setString(3, contract.getDstitle());
-                stmtC.setInt(4, contract.getCdtemplate() > 0 ? contract.getCdtemplate() : 1);
-                stmtC.setInt(5, contract.getCdproperty());
-                stmtC.setInt(6, contract.getCdindex());
+            String sqlContract = "INSERT INTO Contracts (dtcreation, dstitle, cdtemplate, cdproperty, cdindex) VALUES (?, ?, ?, ?, ?)";
+            try (PreparedStatement stmtC = conn.prepareStatement(sqlContract, Statement.RETURN_GENERATED_KEYS)) {
+                stmtC.setDate(1, Date.valueOf(contract.getDtcreation()));
+                stmtC.setString(2, contract.getDstitle());
+                stmtC.setInt(3, contract.getCdtemplate() > 0 ? contract.getCdtemplate() : 1);
+                stmtC.setInt(4, contract.getCdproperty());
+                stmtC.setInt(5, contract.getCdindex());
                 stmtC.executeUpdate();
+                try (ResultSet keys = stmtC.getGeneratedKeys()) {
+                    if (keys.next()) {
+                        generatedContractId = keys.getInt(1);
+                        contract.setCdcontract(generatedContractId);
+                    }
+                }
             }
 
             // 2. Vincula os Participantes (Locatário, Proprietário, etc.)
@@ -49,23 +49,14 @@ public class ContractDAO {
             }
 
             // 3. Gera as Parcelas Financeiras
-            int generatedInstallmentId = 0;
-            String sqlMaxInst = "SELECT COALESCE(MAX(cdinstallment), 0) FROM Installments";
-            try (Statement st = conn.createStatement();
-                 ResultSet rsMaxInst = st.executeQuery(sqlMaxInst)) {
-                if (rsMaxInst.next()) generatedInstallmentId = rsMaxInst.getInt(1);
-            }
-
-            String sqlInstallments = "INSERT INTO Installments (cdinstallment, dtdue, vlbase, cdstatus, nrinstallment, cdcontract) VALUES (?, ?, ?, ?, ?, ?)";
+            String sqlInstallments = "INSERT INTO Installments (dtdue, vlbase, cdstatus, nrinstallment, cdcontract) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement stmtI = conn.prepareStatement(sqlInstallments)) {
                 for (Installments inst : installments) {
-                    generatedInstallmentId++;
-                    stmtI.setInt(1, generatedInstallmentId);
-                    stmtI.setDate(2, Date.valueOf(inst.getDtdue()));
-                    stmtI.setDouble(3, inst.getVlbase());
-                    stmtI.setInt(4, inst.getCdstatus());
-                    stmtI.setInt(5, inst.getNrinstallment());
-                    stmtI.setInt(6, generatedContractId);
+                    stmtI.setDate(1, Date.valueOf(inst.getDtdue()));
+                    stmtI.setDouble(2, inst.getVlbase());
+                    stmtI.setInt(3, inst.getCdstatus());
+                    stmtI.setInt(4, inst.getNrinstallment());
+                    stmtI.setInt(5, generatedContractId);
                     stmtI.addBatch();
                 }
                 stmtI.executeBatch();
@@ -83,11 +74,11 @@ public class ContractDAO {
 
             // 5. Grava Comissão (se houver)
             if (commission != null) {
-                String sqlCom = "INSERT INTO Commissions (vlcommission, cdcontract, cduser) VALUES (?, ?, ?)";
+                String sqlCom = "INSERT INTO Commissions (vlcommission, dtpayment, cdcontract) VALUES (?, ?, ?)";
                 try (PreparedStatement stmtCom = conn.prepareStatement(sqlCom)) {
                     stmtCom.setDouble(1, commission.getVlcommission());
-                    stmtCom.setInt(2, generatedContractId);
-                    stmtCom.setInt(3, commission.getCduser());
+                    stmtCom.setDate(2, commission.getDtpayment() != null ? Date.valueOf(commission.getDtpayment()) : null);
+                    stmtCom.setInt(3, generatedContractId);
                     stmtCom.executeUpdate();
                 }
             }
