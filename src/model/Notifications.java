@@ -2,56 +2,71 @@ package model;
 
 import java.time.LocalDate;
 
+/**
+ * Representa a entidade de Notificações enviadas aos usuários.
+ */
 public class Notifications {
-    private int cdnotification; // Primary Key
-    private String dsmessage;    // text - Corrigido dsmensage
-    private LocalDate dtsend;   // date
-    private int cdcontract;     // Foreign Key para Contracts
-    private int cduser;         // Foreign Key para Users
-    private int fgstatus;       // Status do ciclo de vida (ver NotificationStatus)
-    private int tpnotification; // Tipo de notificação (ver NotificationType)
-    // Getters e Setters
-    
+    private int cdnotification;
+    private String dsmessage;
+    private LocalDate dtsend;
+    private int cdcontract;
+    private int cduser;
+    private int cdnotificationtemplate;
+    private int fgchannel;
+
     public int getCdnotification() {
         return cdnotification;
     }
+
     public void setCdnotification(int cdnotification) {
         this.cdnotification = cdnotification;
     }
+
     public String getDsmessage() {
         return dsmessage;
     }
+
     public void setDsmessage(String dsmessage) {
         this.dsmessage = dsmessage;
     }
+
     public LocalDate getDtsend() {
         return dtsend;
     }
+
     public void setDtsend(LocalDate dtsend) {
         this.dtsend = dtsend;
     }
+
     public int getCdcontract() {
         return cdcontract;
     }
+
     public void setCdcontract(int cdcontract) {
         this.cdcontract = cdcontract;
     }
+
     public int getCduser() {
         return cduser;
     }
+
     public void setCduser(int cduser) {
         this.cduser = cduser;
     }
-    public int getFgstatus() {
-        return fgstatus;
+
+    public int getCdnotificationtemplate() {
+        return cdnotificationtemplate;
     }
-    public void setFgstatus(int fgstatus) {
-        this.fgstatus = fgstatus;
+
+    public void setCdnotificationtemplate(int cdnotificationtemplate) {
+        this.cdnotificationtemplate = cdnotificationtemplate;
     }
-    public int getTpnotification() {
-        return tpnotification;
+
+    public int getFgchannel() {
+        return fgchannel;
     }
-    public void setTpnotification(int tpnotification) {
-        this.tpnotification = tpnotification;
+
+    public void setFgchannel(int fgchannel) {
+        this.fgchannel = fgchannel;
     }
 }

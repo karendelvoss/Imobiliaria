@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para os status de imóvel (ex: Disponível, Alugado).
+ */
 public class PropertyStatusDAO {
+
+    /**
+     * Insere um novo status de imóvel.
+     * 
+     * @param psObj Objeto contendo os dados do status.
+     */
     public void insert(Property_Status psObj) {
         String sql = "INSERT INTO Property_Status (nmstatus) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
@@ -21,6 +30,12 @@ public class PropertyStatusDAO {
         }
     }
 
+    /**
+     * Busca um status de imóvel pelo ID.
+     * 
+     * @param id Identificador do status.
+     * @return Objeto Property_Status ou null.
+     */
     public Property_Status findById(int id) {
         String sql = "SELECT * FROM Property_Status WHERE cdstatus = ?";
         try (Connection conn = Conexao.getConexao();
@@ -40,6 +55,11 @@ public class PropertyStatusDAO {
         return null;
     }
 
+    /**
+     * Lista todos os status de imóvel cadastrados.
+     * 
+     * @return Lista de objetos Property_Status.
+     */
     public List<Property_Status> listAll() {
         List<Property_Status> list = new ArrayList<>();
         String sql = "SELECT * FROM Property_Status ORDER BY cdstatus";
@@ -58,6 +78,11 @@ public class PropertyStatusDAO {
         return list;
     }
 
+    /**
+     * Atualiza um status de imóvel existente.
+     * 
+     * @param psObj Objeto contendo os dados atualizados.
+     */
     public void update(Property_Status psObj) {
         String sql = "UPDATE Property_Status SET nmstatus = ? WHERE cdstatus = ?";
         try (Connection conn = Conexao.getConexao();
@@ -70,13 +95,18 @@ public class PropertyStatusDAO {
         }
     }
 
+    /**
+     * Exclui um status de imóvel.
+     * 
+     * @param id Identificador do status.
+     * @return true se excluído com sucesso.
+     */
     public boolean delete(int id) {
         String sql = "DELETE FROM Property_Status WHERE cdstatus = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            int rows = ps.executeUpdate();
-            return rows > 0;
+            return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("Erro ao excluir status: " + e.getMessage());
             return false;

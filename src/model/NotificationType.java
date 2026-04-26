@@ -1,12 +1,12 @@
 package model;
 
 /**
- * Enum para representar os tipos de notificação.
+ * @deprecated Use {@link NotificationChannel} para o canal de envio.
  */
+@Deprecated
 public enum NotificationType {
     EMAIL(1, "E-mail"),
-    SMS(2, "SMS"),
-    PUSH(3, "Push");
+    WHATSAPP(2, "WhatsApp");
 
     private final int code;
     private final String description;
@@ -16,13 +16,24 @@ public enum NotificationType {
         this.description = description;
     }
 
-    public int getCode() { return code; }
-    public String getDescription() { return description; }
+    public int getCode() {
+        return code;
+    }
 
+    public String getDescription() {
+        return description;
+    }
+
+    /**
+     * Retorna o enum correspondente ao código informado.
+     * 
+     * @param code Código do tipo.
+     * @return NotificationType correspondente.
+     */
     public static NotificationType fromCode(int code) {
-        for (NotificationType type : NotificationType.values()) {
+        for (NotificationType type : values()) {
             if (type.getCode() == code) return type;
         }
-        return EMAIL; // Padrão seguro
+        return EMAIL;
     }
 }

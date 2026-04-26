@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para os tipos de imóvel (ex: Casa, Apartamento).
+ */
 public class PropertyTypeDAO {
+
+    /**
+     * Insere um novo tipo de imóvel.
+     * 
+     * @param pt Objeto contendo os dados do tipo de imóvel.
+     */
     public void insert(Property_Types pt) {
         String sql = "INSERT INTO Property_Types (nmtype) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
@@ -21,6 +30,12 @@ public class PropertyTypeDAO {
         }
     }
 
+    /**
+     * Busca um tipo de imóvel pelo ID.
+     * 
+     * @param id Identificador do tipo de imóvel.
+     * @return Objeto Property_Types ou null.
+     */
     public Property_Types findById(int id) {
         String sql = "SELECT * FROM Property_Types WHERE cdtype = ?";
         try (Connection conn = Conexao.getConexao();
@@ -40,6 +55,11 @@ public class PropertyTypeDAO {
         return null;
     }
 
+    /**
+     * Lista todos os tipos de imóvel cadastrados.
+     * 
+     * @return Lista de objetos Property_Types.
+     */
     public List<Property_Types> listAll() {
         List<Property_Types> list = new ArrayList<>();
         String sql = "SELECT * FROM Property_Types ORDER BY cdtype";
@@ -58,6 +78,11 @@ public class PropertyTypeDAO {
         return list;
     }
 
+    /**
+     * Atualiza um tipo de imóvel existente.
+     * 
+     * @param pt Objeto contendo os dados atualizados.
+     */
     public void update(Property_Types pt) {
         String sql = "UPDATE Property_Types SET nmtype = ? WHERE cdtype = ?";
         try (Connection conn = Conexao.getConexao();
@@ -70,13 +95,18 @@ public class PropertyTypeDAO {
         }
     }
 
+    /**
+     * Exclui um tipo de imóvel.
+     * 
+     * @param id Identificador do tipo de imóvel.
+     * @return true se excluído com sucesso.
+     */
     public boolean delete(int id) {
         String sql = "DELETE FROM Property_Types WHERE cdtype = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            int rows = ps.executeUpdate();
-            return rows > 0;
+            return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("Erro ao excluir tipo de imóvel: " + e.getMessage());
             return false;

@@ -1,7 +1,7 @@
 package model;
 
 /**
- * Enum para representar os status de assinatura de um participante no contrato.
+ * Define os status possíveis de assinatura de um participante em um contrato.
  */
 public enum SignatureStatus {
     PENDENTE(1, "Pendente"),
@@ -16,13 +16,24 @@ public enum SignatureStatus {
         this.description = description;
     }
 
-    public int getCode() { return code; }
-    public String getDescription() { return description; }
+    public int getCode() {
+        return code;
+    }
 
+    public String getDescription() {
+        return description;
+    }
+
+    /**
+     * Retorna o enum correspondente ao código informado.
+     * 
+     * @param code Código do status.
+     * @return SignatureStatus correspondente.
+     */
     public static SignatureStatus fromCode(int code) {
         for (SignatureStatus status : SignatureStatus.values()) {
             if (status.getCode() == code) return status;
         }
-        return PENDENTE; // Retorna um padrão seguro
+        return PENDENTE;
     }
 }

@@ -4,6 +4,9 @@ import dao.OccupationDAO;
 import model.Occupations;
 import static view.ConsoleIO.*;
 
+/**
+ * Tela responsável pela gestão do cadastro de profissões.
+ */
 public class OccupationView {
 
     private final OccupationDAO dao;
@@ -12,6 +15,9 @@ public class OccupationView {
         this.dao = dao;
     }
 
+    /**
+     * Menu principal do cadastro de profissões.
+     */
     public void menu() {
         System.out.println("\n--- SUBMENU: PROFISSÕES ---");
         System.out.println("1. Cadastrar 2. Listar 3. Atualizar 4. Excluir");
@@ -25,7 +31,6 @@ public class OccupationView {
     }
 
     private void cadastrar() {
-        System.out.println("\n--- CADASTRAR PROFISSÃO ---");
         Occupations occ = new Occupations();
         occ.setNmoccupation(ler("Nome da Profissão: "));
         dao.save(occ);

@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para os papéis de usuário (Roles).
+ */
 public class RoleDAO {
+
+    /**
+     * Insere um novo papel no banco de dados.
+     * 
+     * @param r Objeto contendo os dados do papel.
+     */
     public void insert(Roles r) {
         String sqlInsert = "INSERT INTO Roles (nmrole) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
@@ -21,6 +30,12 @@ public class RoleDAO {
         }
     }
 
+    /**
+     * Busca um papel pelo seu identificador.
+     * 
+     * @param id Identificador do papel.
+     * @return Objeto Roles ou null.
+     */
     public Roles findById(int id) {
         String sql = "SELECT * FROM Roles WHERE cdrole = ?";
         try (Connection conn = Conexao.getConexao();
@@ -40,6 +55,11 @@ public class RoleDAO {
         return null;
     }
 
+    /**
+     * Lista todos os papéis cadastrados.
+     * 
+     * @return Lista de objetos Roles.
+     */
     public List<Roles> listAll() {
         List<Roles> list = new ArrayList<>();
         String sql = "SELECT * FROM Roles";
@@ -58,6 +78,11 @@ public class RoleDAO {
         return list;
     }
 
+    /**
+     * Atualiza os dados de um papel existente.
+     * 
+     * @param r Objeto contendo os dados atualizados.
+     */
     public void update(Roles r) {
         String sql = "UPDATE Roles SET nmrole=? WHERE cdrole=?";
         try (Connection conn = Conexao.getConexao();
@@ -70,13 +95,18 @@ public class RoleDAO {
         }
     }
 
+    /**
+     * Exclui um papel pelo seu identificador.
+     * 
+     * @param id Identificador do papel.
+     * @return true se excluído com sucesso.
+     */
     public boolean delete(int id) {
         String sql = "DELETE FROM Roles WHERE cdrole = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            int rows = ps.executeUpdate();
-            return rows > 0;
+            return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("Erro ao excluir papel: " + e.getMessage());
             return false;

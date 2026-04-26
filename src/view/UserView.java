@@ -15,7 +15,9 @@ import java.util.List;
 
 import static view.ConsoleIO.*;
 
-/** Fluxos de UI para a entidade Usuário. */
+/**
+ * Interface de console para gestão de usuários.
+ */
 public class UserView {
 
     private static final DateTimeFormatter DF_BR = DateTimeFormatter.ofPattern("dd/MM/yyyy");
@@ -26,6 +28,9 @@ public class UserView {
         this.userDAO = userDAO;
     }
 
+    /**
+     * Menu principal para operações com usuários.
+     */
     public void menu() {
         System.out.println("\n--- SUBMENU: USUÁRIOS ---");
         System.out.println("1. Cadastrar 2. Consultar 3. Atualizar 4. Excluir");
@@ -38,7 +43,12 @@ public class UserView {
         }
     }
 
-    private void cadastrar() {
+    /**
+     * Fluxo de cadastro de um novo usuário.
+     * 
+     * @return ID do usuário criado ou -1 se cancelado.
+     */
+    public int cadastrar() {
         Users u = new Users();
         u.setNmuser(ler("Nome: "));
         
@@ -46,43 +56,47 @@ public class UserView {
             String doc = ler("Doc (Apenas 11 números): ");
             if (doc.matches("\\d{11}")) {
                 u.setDocument(doc);
+                u.setFgdocument(true);
                 break;
             }
             System.out.println("ERRO: O documento deve conter exatamente 11 números!");
         }
+
+        u.setDsissuingbody(ler("Órgão Emissor do Documento: "));
         
         while (true) {
-            String cel = ler("Celular (Ex: 11 98888-7777 ou 011 8888-7777): ");
+            String cel = ler("Celular (Ex: 11 98888-7777): ");
             if (cel.matches("\\d{2,3} \\d{4,5}-\\d{4}")) {
                 u.setNrcellphone(cel);
                 break;
             }
-            System.out.println("ERRO: Formato de celular inválido. Siga o exemplo com DDD, espaço e traço.");
+            System.out.println("ERRO: Formato de celular inválido.");
         }
         
         while (true) {
-            String dataStr = ler("Data Nasc (AAAA-MM-DD ou AAAA/MM/DD): ");
+            String dataStr = ler("Data Nasc (AAAA-MM-DD): ");
             try {
                 u.setDtbirth(LocalDate.parse(dataStr.replace("/", "-")));
                 break;
             } catch (Exception e) {
-                System.out.println("ERRO: Data inválida! Use o formato AAAA-MM-DD ou AAAA/MM/DD (Ex: 1990-12-31).");
+                System.out.println("ERRO: Data inválida!");
             }
         }
         
         int idAdd = lerIdValido("ID Endereço (0 para cancelar)", 
                 id -> checkAddressExists(id) ? id : null, 
                 this::listAddresses);
-        if (idAdd == -1) return;
+        if (idAdd == -1) return -1;
         u.setCdaddress(idAdd);
 
         int idOcc = lerIdValido("ID Profissão (0 para cancelar)", 
                 id -> checkOccupationExists(id) ? id : null, 
                 this::listOccupations);
-        if (idOcc == -1) return;
+        if (idOcc == -1) return -1;
         u.setCdoccupation(idOcc);
         
         userDAO.saveUser(u, null);
+        return u.getCduser();
     }
 
     private void consultar() {
@@ -90,8 +104,11 @@ public class UserView {
             String input = ler("\nID do Usuário para consulta detalhada: ");
             if (input.isEmpty()) return;
             Users u = userDAO.findById(Integer.parseInt(input));
-            if (u != null) { imprimir(u); return; }
-            if (confirmar("ERRO: Usuário não encontrado. Listar todos? (s/n): ")) {
+            if (u != null) {
+                imprimir(u);
+                return;
+            }
+            if (confirmar("Usuário não encontrado. Listar todos? (s/n): ")) {
                 userDAO.getAllUsersList().forEach(System.out::println);
             } else return;
         }
@@ -215,7 +232,9 @@ public class UserView {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
-        } catch (SQLException e) { return false; }
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     private void listAddresses() {
@@ -227,7 +246,9 @@ public class UserView {
             while (rs.next()) {
                 System.out.println("ID: " + rs.getInt("cdaddress") + " | " + rs.getString("nmstreet") + ", " + rs.getString("nraddress"));
             }
-        } catch (SQLException e) { System.out.println("Erro ao buscar endereços."); }
+        } catch (SQLException e) {
+            System.out.println("Erro ao buscar endereços.");
+        }
     }
 
     private boolean checkOccupationExists(int id) {
@@ -238,7 +259,9 @@ public class UserView {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
-        } catch (SQLException e) { return false; }
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     private void listOccupations() {
@@ -250,6 +273,8 @@ public class UserView {
             while (rs.next()) {
                 System.out.println("ID: " + rs.getInt("cdoccupation") + " | " + rs.getString("nmoccupation"));
             }
-        } catch (SQLException e) { System.out.println("Erro ao buscar profissões."); }
+        } catch (SQLException e) {
+            System.out.println("Erro ao buscar profissões.");
+        }
     }
 }

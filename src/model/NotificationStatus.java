@@ -1,7 +1,7 @@
 package model;
 
 /**
- * Enum para representar o status de ciclo de vida de uma notificação.
+ * Define os status possíveis de uma notificação.
  */
 public enum NotificationStatus {
     AGENDADA(1, "Agendada"),
@@ -16,13 +16,24 @@ public enum NotificationStatus {
         this.description = description;
     }
 
-    public int getCode() { return code; }
-    public String getDescription() { return description; }
+    public int getCode() {
+        return code;
+    }
 
+    public String getDescription() {
+        return description;
+    }
+
+    /**
+     * Retorna o enum correspondente ao código informado.
+     * 
+     * @param code Código do status.
+     * @return NotificationStatus correspondente.
+     */
     public static NotificationStatus fromCode(int code) {
         for (NotificationStatus status : NotificationStatus.values()) {
             if (status.getCode() == code) return status;
         }
-        return AGENDADA; // Padrão seguro
+        return AGENDADA;
     }
 }

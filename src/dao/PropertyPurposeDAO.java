@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para as finalidades de imóvel (ex: Venda, Locação).
+ */
 public class PropertyPurposeDAO {
+
+    /**
+     * Insere uma nova finalidade de imóvel.
+     * 
+     * @param pp Objeto contendo os dados da finalidade.
+     */
     public void insert(Property_Purposes pp) {
         String sql = "INSERT INTO Property_Purposes (nmpurpose) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
@@ -21,6 +30,12 @@ public class PropertyPurposeDAO {
         }
     }
 
+    /**
+     * Busca uma finalidade de imóvel pelo ID.
+     * 
+     * @param id Identificador da finalidade.
+     * @return Objeto Property_Purposes ou null.
+     */
     public Property_Purposes findById(int id) {
         String sql = "SELECT * FROM Property_Purposes WHERE cdpurpose = ?";
         try (Connection conn = Conexao.getConexao();
@@ -40,6 +55,11 @@ public class PropertyPurposeDAO {
         return null;
     }
 
+    /**
+     * Lista todas as finalidades de imóvel cadastradas.
+     * 
+     * @return Lista de objetos Property_Purposes.
+     */
     public List<Property_Purposes> listAll() {
         List<Property_Purposes> list = new ArrayList<>();
         String sql = "SELECT * FROM Property_Purposes ORDER BY cdpurpose";
@@ -58,6 +78,11 @@ public class PropertyPurposeDAO {
         return list;
     }
 
+    /**
+     * Atualiza uma finalidade de imóvel existente.
+     * 
+     * @param pp Objeto contendo os dados atualizados.
+     */
     public void update(Property_Purposes pp) {
         String sql = "UPDATE Property_Purposes SET nmpurpose = ? WHERE cdpurpose = ?";
         try (Connection conn = Conexao.getConexao();
@@ -70,13 +95,18 @@ public class PropertyPurposeDAO {
         }
     }
 
+    /**
+     * Exclui uma finalidade de imóvel.
+     * 
+     * @param id Identificador da finalidade.
+     * @return true se excluída com sucesso.
+     */
     public boolean delete(int id) {
         String sql = "DELETE FROM Property_Purposes WHERE cdpurpose = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            int rows = ps.executeUpdate();
-            return rows > 0;
+            return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("Erro ao excluir finalidade: " + e.getMessage());
             return false;

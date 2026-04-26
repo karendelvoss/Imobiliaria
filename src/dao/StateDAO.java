@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para a entidade de Estados.
+ */
 public class StateDAO {
+
+    /**
+     * Insere um novo estado no banco de dados.
+     * 
+     * @param s Objeto contendo os dados do estado.
+     */
     public void insert(States s) {
         String sqlInsert = "INSERT INTO States (nmstate, sgstate, cdcountry) VALUES (?, ?, ?)";
         try (Connection conn = Conexao.getConexao();
@@ -23,6 +32,12 @@ public class StateDAO {
         }
     }
 
+    /**
+     * Busca um estado pelo seu identificador.
+     * 
+     * @param id Identificador do estado.
+     * @return Objeto States ou null.
+     */
     public States findById(int id) {
         String sql = "SELECT * FROM States WHERE cdstate = ?";
         try (Connection conn = Conexao.getConexao();
@@ -44,6 +59,11 @@ public class StateDAO {
         return null;
     }
 
+    /**
+     * Lista todos os estados cadastrados.
+     * 
+     * @return Lista de objetos States.
+     */
     public List<States> listAll() {
         List<States> list = new ArrayList<>();
         String sql = "SELECT * FROM States ORDER BY cdstate";
@@ -64,6 +84,11 @@ public class StateDAO {
         return list;
     }
 
+    /**
+     * Atualiza os dados de um estado existente.
+     * 
+     * @param s Objeto contendo os dados atualizados.
+     */
     public void update(States s) {
         String sql = "UPDATE States SET nmstate=?, sgstate=?, cdcountry=? WHERE cdstate=?";
         try (Connection conn = Conexao.getConexao();
@@ -78,10 +103,20 @@ public class StateDAO {
         }
     }
 
+    /**
+     * Exclui um estado pelo seu identificador.
+     * 
+     * @param id Identificador do estado.
+     * @return true se excluído com sucesso.
+     */
     public boolean delete(int id) {
         String sql = "DELETE FROM States WHERE cdstate = ?";
         try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id); return ps.executeUpdate() > 0;
-        } catch (SQLException e) { System.err.println("Erro ao excluir estado: " + e.getMessage()); return false; }
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            System.err.println("Erro ao excluir estado: " + e.getMessage());
+            return false;
+        }
     }
 }

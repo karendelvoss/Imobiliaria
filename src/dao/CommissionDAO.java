@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para as comissões.
+ */
 public class CommissionDAO {
+
+    /**
+     * Insere uma nova comissão no banco de dados.
+     * 
+     * @param c Objeto contendo os dados da comissão.
+     */
     public void insert(Commissions c) {
         String sql = "INSERT INTO Commissions (vlcommission, dtpayment, cdcontract) VALUES (?, ?, ?)";
         try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -34,10 +43,17 @@ public class CommissionDAO {
                     return c;
                 }
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
         return null;
     }
 
+    /**
+     * Lista todas as comissões cadastradas.
+     * 
+     * @return Lista de objetos Commissions.
+     */
     public List<Commissions> listAll() {
         List<Commissions> list = new ArrayList<>();
         String sql = "SELECT * FROM Commissions ORDER BY cdcommission";
@@ -50,20 +66,43 @@ public class CommissionDAO {
                 c.setCdcontract(rs.getInt("cdcontract"));
                 list.add(c);
             }
-        } catch (SQLException e) { e.printStackTrace(); }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
         return list;
     }
 
+    /**
+     * Atualiza os dados de uma comissão existente.
+     * 
+     * @param c Objeto contendo os dados atualizados.
+     */
     public void update(Commissions c) {
         String sql = "UPDATE Commissions SET vlcommission=?, dtpayment=?, cdcontract=? WHERE cdcommission=?";
         try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDouble(1, c.getVlcommission()); ps.setDate(2, c.getDtpayment() != null ? Date.valueOf(c.getDtpayment()) : null);
-            ps.setInt(3, c.getCdcontract()); ps.setInt(4, c.getCdcommission()); ps.executeUpdate();
-        } catch (SQLException e) { e.printStackTrace(); }
+            ps.setDouble(1, c.getVlcommission());
+            ps.setDate(2, c.getDtpayment() != null ? Date.valueOf(c.getDtpayment()) : null);
+            ps.setInt(3, c.getCdcontract());
+            ps.setInt(4, c.getCdcommission());
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
     }
 
+    /**
+     * Exclui uma comissão pelo seu identificador.
+     * 
+     * @param id Identificador da comissão.
+     * @return true se excluída com sucesso.
+     */
     public boolean delete(int id) {
         String sql = "DELETE FROM Commissions WHERE cdcommission = ?";
-        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) { ps.setInt(1, id); return ps.executeUpdate() > 0; } catch (SQLException e) { return false; }
+        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, id);
+            return ps.executeUpdate() > 0;
+        } catch (SQLException e) {
+            return false;
+        }
     }
 }

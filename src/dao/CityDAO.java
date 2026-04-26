@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para a entidade de Cidades.
+ */
 public class CityDAO {
+
+    /**
+     * Insere uma nova cidade no banco de dados.
+     * 
+     * @param c Objeto contendo os dados da cidade.
+     */
     public void insert(Cities c) {
         String sqlInsert = "INSERT INTO Cities (nmcity, cdstate) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
@@ -16,12 +25,17 @@ public class CityDAO {
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) c.setCdcity(keys.getInt(1));
             }
-            System.out.println("Cidade inserida com sucesso! (ID: " + c.getCdcity() + ")");
         } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
+    /**
+     * Busca uma cidade pelo seu identificador.
+     * 
+     * @param id Identificador da cidade.
+     * @return Objeto Cities ou null.
+     */
     public Cities findById(int id) {
         String sql = "SELECT * FROM Cities WHERE cdcity = ?";
         try (Connection conn = Conexao.getConexao();
@@ -42,6 +56,11 @@ public class CityDAO {
         return null;
     }
 
+    /**
+     * Lista todas as cidades cadastradas.
+     * 
+     * @return Lista de objetos Cities.
+     */
     public List<Cities> listAll() {
         List<Cities> list = new ArrayList<>();
         String sql = "SELECT * FROM Cities";
@@ -61,6 +80,11 @@ public class CityDAO {
         return list;
     }
 
+    /**
+     * Atualiza os dados de uma cidade existente.
+     * 
+     * @param c Objeto contendo os dados atualizados.
+     */
     public void update(Cities c) {
         String sql = "UPDATE Cities SET nmcity=?, cdstate=? WHERE cdcity=?";
         try (Connection conn = Conexao.getConexao();
@@ -74,6 +98,11 @@ public class CityDAO {
         }
     }
 
+    /**
+     * Exclui uma cidade pelo seu identificador.
+     * 
+     * @param id Identificador da cidade.
+     */
     public void delete(int id) {
         String sql = "DELETE FROM Cities WHERE cdcity = ?";
         try (Connection conn = Conexao.getConexao();

@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para a entidade de Bairros.
+ */
 public class DistrictDAO {
+
+    /**
+     * Insere um novo bairro no banco de dados.
+     * 
+     * @param d Objeto contendo os dados do bairro.
+     */
     public void insert(Districts d) {
         String sqlInsert = "INSERT INTO Districts (nmdistrict, cdcity) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
@@ -22,6 +31,12 @@ public class DistrictDAO {
         }
     }
 
+    /**
+     * Busca um bairro pelo seu identificador.
+     * 
+     * @param id Identificador do bairro.
+     * @return Objeto Districts ou null.
+     */
     public Districts findById(int id) {
         String sql = "SELECT * FROM Districts WHERE cddistrict = ?";
         try (Connection conn = Conexao.getConexao();
@@ -42,6 +57,11 @@ public class DistrictDAO {
         return null;
     }
 
+    /**
+     * Lista todos os bairros cadastrados.
+     * 
+     * @return Lista de objetos Districts.
+     */
     public List<Districts> listAll() {
         List<Districts> list = new ArrayList<>();
         String sql = "SELECT * FROM Districts";
@@ -61,6 +81,11 @@ public class DistrictDAO {
         return list;
     }
 
+    /**
+     * Atualiza os dados de um bairro existente.
+     * 
+     * @param d Objeto contendo os dados atualizados.
+     */
     public void update(Districts d) {
         String sql = "UPDATE Districts SET nmdistrict=?, cdcity=? WHERE cddistrict=?";
         try (Connection conn = Conexao.getConexao();
@@ -74,6 +99,11 @@ public class DistrictDAO {
         }
     }
 
+    /**
+     * Exclui um bairro pelo seu identificador.
+     * 
+     * @param id Identificador do bairro.
+     */
     public void delete(int id) {
         String sql = "DELETE FROM Districts WHERE cddistrict = ?";
         try (Connection conn = Conexao.getConexao();

@@ -5,28 +5,51 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência e processos de negócio de contratos.
+ */
 public class ContractDAO {
 
     /**
-     * PROCESSO DE NEGÓCIO: Cria um contrato completo (Partes + Parcelas) 
-     * e atualiza o status do imóvel em uma única transação.
+     * Realiza o registro completo de um contrato, incluindo participantes, parcelas e comissões.
+     * Atualiza o status do imóvel vinculado em uma única transação.
+     * 
+     * @param contract Objeto contendo os dados do contrato.
+     * @param participants Lista de participantes e seus papéis.
+     * @param installments Lista de parcelas financeiras.
+     * @param commission Objeto contendo os dados da comissão, se houver.
+     * @param novoStatus Novo código de status para o imóvel.
      */
     public void processFullContract(Contracts contract, List<User_Contract> participants, List<Installments> installments, Commissions commission, int novoStatus) {
         Connection conn = null;
         try {
             conn = Conexao.getConexao();
-            conn.setAutoCommit(false); // Inicia a transação (ACID)
+            conn.setAutoCommit(false);
 
             int generatedContractId = 0;
 
-            // 1. Salva o Contrato principal e recupera o ID gerado
-            String sqlContract = "INSERT INTO Contracts (dtcreation, dstitle, cdtemplate, cdproperty, cdindex) VALUES (?, ?, ?, ?, ?)";
+            String sqlContract = "INSERT INTO Contracts (dtcreation, dstitle, cdtemplate, cdproperty, cdindex, dtlimit, cdstatus, cdnotary) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
             try (PreparedStatement stmtC = conn.prepareStatement(sqlContract, Statement.RETURN_GENERATED_KEYS)) {
                 stmtC.setDate(1, Date.valueOf(contract.getDtcreation()));
                 stmtC.setString(2, contract.getDstitle());
                 stmtC.setInt(3, contract.getCdtemplate() > 0 ? contract.getCdtemplate() : 1);
                 stmtC.setInt(4, contract.getCdproperty());
-                stmtC.setInt(5, contract.getCdindex());
+                if (contract.getCdindex() > 0) {
+                    stmtC.setInt(5, contract.getCdindex());
+                } else {
+                    stmtC.setNull(5, Types.INTEGER);
+                }
+                if (contract.getDtlimit() != null) {
+                    stmtC.setDate(6, Date.valueOf(contract.getDtlimit()));
+                } else {
+                    stmtC.setNull(6, Types.DATE);
+                }
+                stmtC.setInt(7, contract.getCdstatus() > 0 ? contract.getCdstatus() : model.ContractStatus.ATIVO.getCode());
+                if (contract.getCdnotary() > 0) {
+                    stmtC.setInt(8, contract.getCdnotary());
+                } else {
+                    stmtC.setNull(8, Types.INTEGER);
+                }
                 stmtC.executeUpdate();
                 try (ResultSet keys = stmtC.getGeneratedKeys()) {
                     if (keys.next()) {
@@ -36,7 +59,6 @@ public class ContractDAO {
                 }
             }
 
-            // 2. Vincula os Participantes (Locatário, Proprietário, etc.)
             String sqlParticipants = "INSERT INTO User_Contract (cdcontract, cduser, cdrole) VALUES (?, ?, ?)";
             try (PreparedStatement stmtP = conn.prepareStatement(sqlParticipants)) {
                 for (User_Contract part : participants) {
@@ -48,7 +70,6 @@ public class ContractDAO {
                 stmtP.executeBatch();
             }
 
-            // 3. Gera as Parcelas Financeiras
             String sqlInstallments = "INSERT INTO Installments (dtdue, vlbase, cdstatus, nrinstallment, cdcontract) VALUES (?, ?, ?, ?, ?)";
             try (PreparedStatement stmtI = conn.prepareStatement(sqlInstallments)) {
                 for (Installments inst : installments) {
@@ -62,7 +83,6 @@ public class ContractDAO {
                 stmtI.executeBatch();
             }
 
-            // 4. REGRA DE NEGÓCIO: Atualiza o status do imóvel (Alugado/Vendido)
             if (novoStatus > 0) {
                 String sqlStatus = "UPDATE Properties SET cdstatus = ? WHERE cdproperty = ?";
                 try (PreparedStatement stmtS = conn.prepareStatement(sqlStatus)) {
@@ -72,7 +92,6 @@ public class ContractDAO {
                 }
             }
 
-            // 5. Grava Comissão (se houver)
             if (commission != null) {
                 String sqlCom = "INSERT INTO Commissions (vlcommission, dtpayment, cdcontract) VALUES (?, ?, ?)";
                 try (PreparedStatement stmtCom = conn.prepareStatement(sqlCom)) {
@@ -97,15 +116,55 @@ public class ContractDAO {
     }
 
     /**
-     * Retorna todos os contratos sem filtro (mantém compatibilidade com ContractView).
+     * Insere um contrato no banco de dados.
+     * 
+     * @param contract Objeto contendo os dados do contrato.
+     * @return O ID gerado para o contrato ou -1 em caso de erro.
+     */
+    public int insertContract(Contracts contract) {
+        String sqlContract = "INSERT INTO Contracts (dtcreation, dstitle, cdtemplate, dtlimit, cdstatus, cdnotary) VALUES (?, ?, ?, ?, ?, ?)";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement stmtC = conn.prepareStatement(sqlContract, Statement.RETURN_GENERATED_KEYS)) {
+            stmtC.setDate(1, Date.valueOf(contract.getDtcreation()));
+            stmtC.setString(2, contract.getDstitle());
+            stmtC.setInt(3, contract.getCdtemplate() > 0 ? contract.getCdtemplate() : 1);
+            if (contract.getDtlimit() != null) {
+                stmtC.setDate(4, Date.valueOf(contract.getDtlimit()));
+            } else {
+                stmtC.setNull(4, Types.DATE);
+            }
+            stmtC.setInt(5, contract.getCdstatus() > 0 ? contract.getCdstatus() : model.ContractStatus.ATIVO.getCode());
+            if (contract.getCdnotary() > 0) {
+                stmtC.setInt(6, contract.getCdnotary());
+            } else {
+                stmtC.setNull(6, Types.INTEGER);
+            }
+            stmtC.executeUpdate();
+            try (ResultSet keys = stmtC.getGeneratedKeys()) {
+                if (keys.next()) {
+                    return keys.getInt(1);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao inserir contrato parcial: " + e.getMessage());
+        }
+        return -1;
+    }
+
+    /**
+     * Lista todos os contratos ativos (modo geral).
+     * 
+     * @return Lista de Strings com ID e Título dos contratos.
      */
     public List<String> getActiveContractsList() {
         return getActiveContractsList("geral");
     }
 
     /**
-     * Auxilia o usuário a encontrar IDs válidos de contratos, filtrando por tipo (venda/locação/geral).
-     * A diferenciação é feita pelo propósito do imóvel atrelado ao contrato.
+     * Lista contratos ativos filtrados por tipo (venda/locação/geral).
+     * 
+     * @param tipo Tipo de filtro desejado.
+     * @return Lista de Strings com ID e Título dos contratos.
      */
     public List<String> getActiveContractsList(String tipo) {
         List<String> list = new ArrayList<>();
@@ -126,11 +185,11 @@ public class ContractDAO {
             
             if (!isGeral) {
                 if (tipo.equalsIgnoreCase("venda")) {
-                    stmt.setString(1, "%vend%");   // Pega "Vendido", "Venda"
+                    stmt.setString(1, "%vend%");
                     stmt.setString(2, "%venda%");
                 } else {
-                    stmt.setString(1, "%alugad%"); // Pega "Alugado"
-                    stmt.setString(2, "%loca%");   // Pega "Locação", "Locado"
+                    stmt.setString(1, "%alugad%");
+                    stmt.setString(2, "%loca%");
                 }
             }
             
@@ -145,6 +204,12 @@ public class ContractDAO {
         return list;
     }
 
+    /**
+     * Busca um contrato pelo seu identificador.
+     * 
+     * @param contractId Identificador do contrato.
+     * @return Objeto Contracts ou null.
+     */
     public Contracts findById(int contractId) {
         String sql = "SELECT * FROM Contracts WHERE cdcontract = ?";
         try (Connection conn = Conexao.getConexao();
@@ -160,19 +225,22 @@ public class ContractDAO {
                     c.setCdtemplate(rs.getInt("cdtemplate"));
                     c.setCdproperty(rs.getInt("cdproperty"));
                     c.setCdindex(rs.getInt("cdindex"));
+                    if (rs.getDate("dtlimit") != null) c.setDtlimit(rs.getDate("dtlimit").toLocalDate());
+                    c.setCdstatus(rs.getInt("cdstatus"));
+                    c.setCdnotary(rs.getInt("cdnotary"));
                     return c;
                 }
             }
         } catch (SQLException e) {
             System.err.println("Erro ao buscar contrato por ID: " + e.getMessage());
-            e.printStackTrace();
         }
         return null;
     }
 
     /**
-     * Busca todos os contratos que possuem um índice de reajuste definido.
-     * @return Uma lista de objetos Contracts.
+     * Busca todos os contratos que possuem índice de reajuste.
+     * 
+     * @return Lista de objetos Contracts.
      */
     public List<Contracts> findAllWithAdjustmentIndex() {
         List<Contracts> contracts = new ArrayList<>();
@@ -190,59 +258,106 @@ public class ContractDAO {
                 c.setCdtemplate(rs.getInt("cdtemplate"));
                 c.setCdproperty(rs.getInt("cdproperty"));
                 c.setCdindex(rs.getInt("cdindex"));
+                if (rs.getDate("dtlimit") != null) c.setDtlimit(rs.getDate("dtlimit").toLocalDate());
+                c.setCdstatus(rs.getInt("cdstatus"));
+                c.setCdnotary(rs.getInt("cdnotary"));
                 contracts.add(c);
             }
         } catch (SQLException e) {
             System.err.println("Erro ao buscar contratos com índice de reajuste: " + e.getMessage());
-            e.printStackTrace();
         }
         return contracts;
     }
 
     /**
-     * RELATÓRIO: Gera o extrato detalhado de parcelas para o console.
+     * Busca contratos que expiram em um determinado mês e ano.
+     * 
+     * @param month Mês de expiração.
+     * @param year Ano de expiração.
+     * @return Lista de contratos expirando.
      */
-   public boolean gerarExtrato(int idContract) {
-    String sql = "SELECT c.dstitle, i.nrinstallment, i.dtdue, i.vlbase, idx.nmindex " +
-                 "FROM Contracts c " + 
-                 "LEFT JOIN Installments i ON c.cdcontract = i.cdcontract " +
-                 "LEFT JOIN Indexes idx ON c.cdindex = idx.cdindex " +
-                 "WHERE c.cdcontract = ? ORDER BY i.nrinstallment";
-
-    try (Connection conn = Conexao.getConexao();
-         PreparedStatement ps = conn.prepareStatement(sql)) {
+    public List<Contracts> findExpiringContracts(int month, int year) {
+        List<Contracts> contracts = new ArrayList<>();
+        String sql = "SELECT * FROM Contracts WHERE cdstatus != 2 AND dtlimit IS NOT NULL " +
+                     "AND EXTRACT(MONTH FROM dtlimit) = ? AND EXTRACT(YEAR FROM dtlimit) = ?";
         
-        ps.setInt(1, idContract);
-        ResultSet rs = ps.executeQuery();
-
-        boolean temDados = false;
-        while (rs.next()) {
-            if (!temDados) {
-                System.out.println("\n--- EXTRATO FINANCEIRO DO CONTRATO ---");
-                System.out.println("Contrato: " + rs.getString("dstitle"));
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            
+            ps.setInt(1, month);
+            ps.setInt(2, year);
+            
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Contracts c = new Contracts();
+                    c.setCdcontract(rs.getInt("cdcontract"));
+                    c.setDtcreation(rs.getDate("dtcreation").toLocalDate());
+                    c.setDstitle(rs.getString("dstitle"));
+                    c.setCdtemplate(rs.getInt("cdtemplate"));
+                    c.setCdproperty(rs.getInt("cdproperty"));
+                    if (rs.getObject("cdindex") != null) c.setCdindex(rs.getInt("cdindex"));
+                    if (rs.getDate("dtlimit") != null) c.setDtlimit(rs.getDate("dtlimit").toLocalDate());
+                    c.setCdstatus(rs.getInt("cdstatus"));
+                    c.setCdnotary(rs.getInt("cdnotary"));
+                    contracts.add(c);
+                }
             }
-            temDados = true;
-            System.out.printf("Parcela #%d | Vencimento: %s | Valor: R$ %.2f | Reajuste: %s\n",
-                    rs.getInt("nrinstallment"),
-                    rs.getDate("dtdue"),
-                    rs.getDouble("vlbase"),
-                    rs.getString("nmindex"));
+        } catch (SQLException e) {
+            System.err.println("Erro ao buscar contratos expirando: " + e.getMessage());
         }
-        
-        if (!temDados) {
-            System.out.println("\nERRO: Nenhum contrato encontrado com o ID " + idContract);
-        }
-        
-        return temDados; // Retorna true se achou, false se não achou
-        
-    } catch (SQLException e) {
-        System.err.println("Erro ao gerar relatório: " + e.getMessage());
-        return false;
-    }
+        return contracts;
     }
 
     /**
-     * Verifica rapidamente se um contrato existe no banco de dados.
+     * Exibe o extrato financeiro do contrato no console.
+     * 
+     * @param idContract Identificador do contrato.
+     * @return true se o contrato foi encontrado e o extrato gerado.
+     */
+    public boolean gerarExtrato(int idContract) {
+        String sql = "SELECT c.dstitle, i.nrinstallment, i.dtdue, i.vlbase, idx.nmindex " +
+                     "FROM Contracts c " + 
+                     "LEFT JOIN Installments i ON c.cdcontract = i.cdcontract " +
+                     "LEFT JOIN Indexes idx ON c.cdindex = idx.cdindex " +
+                     "WHERE c.cdcontract = ? ORDER BY i.nrinstallment";
+
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            
+            ps.setInt(1, idContract);
+            ResultSet rs = ps.executeQuery();
+
+            boolean temDados = false;
+            while (rs.next()) {
+                if (!temDados) {
+                    System.out.println("\n--- EXTRATO FINANCEIRO DO CONTRATO ---");
+                    System.out.println("Contrato: " + rs.getString("dstitle"));
+                }
+                temDados = true;
+                System.out.printf("Parcela #%d | Vencimento: %s | Valor: R$ %.2f | Reajuste: %s\n",
+                        rs.getInt("nrinstallment"),
+                        rs.getDate("dtdue"),
+                        rs.getDouble("vlbase"),
+                        rs.getString("nmindex"));
+            }
+            
+            if (!temDados) {
+                System.out.println("\nERRO: Nenhum contrato encontrado com o ID " + idContract);
+            }
+            
+            return temDados;
+            
+        } catch (SQLException e) {
+            System.err.println("Erro ao gerar relatório: " + e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Verifica se um contrato existe.
+     * 
+     * @param idContract Identificador do contrato.
+     * @return true se o contrato existe.
      */
     public boolean contractExists(int idContract) {
         String sql = "SELECT 1 FROM Contracts WHERE cdcontract = ?";
@@ -256,15 +371,40 @@ public class ContractDAO {
         return false;
     }
 
+    /**
+     * Atualiza os dados de um contrato.
+     * 
+     * @param c Objeto contendo os dados atualizados.
+     */
     public void updateContract(Contracts c) {
-        String sql = "UPDATE Contracts SET dstitle=?, cdtemplate=?, cdindex=?, dtcreation=? WHERE cdcontract=?";
+        String sql = "UPDATE Contracts SET dstitle=?, cdtemplate=?, cdindex=?, dtcreation=?, dtlimit=?, cdproperty=?, cdstatus=?, cdnotary=? WHERE cdcontract=?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, c.getDstitle());
             ps.setInt(2, c.getCdtemplate());
-            ps.setInt(3, c.getCdindex());
+            if (c.getCdindex() > 0) {
+                ps.setInt(3, c.getCdindex());
+            } else {
+                ps.setNull(3, Types.INTEGER);
+            }
             ps.setDate(4, Date.valueOf(c.getDtcreation()));
-            ps.setInt(5, c.getCdcontract());
+            if (c.getDtlimit() != null) {
+                ps.setDate(5, Date.valueOf(c.getDtlimit()));
+            } else {
+                ps.setNull(5, Types.DATE);
+            }
+            if (c.getCdproperty() > 0) {
+                ps.setInt(6, c.getCdproperty());
+            } else {
+                ps.setNull(6, Types.INTEGER);
+            }
+            ps.setInt(7, c.getCdstatus() > 0 ? c.getCdstatus() : model.ContractStatus.ATIVO.getCode());
+            if (c.getCdnotary() > 0) {
+                ps.setInt(8, c.getCdnotary());
+            } else {
+                ps.setNull(8, Types.INTEGER);
+            }
+            ps.setInt(9, c.getCdcontract());
             ps.executeUpdate();
             System.out.println("Contrato atualizado com sucesso!");
         } catch (SQLException e) {
@@ -272,12 +412,17 @@ public class ContractDAO {
         }
     }
 
+    /**
+     * Exclui um contrato e todas as suas dependências em uma única transação.
+     * 
+     * @param id Identificador do contrato.
+     * @return true se a exclusão foi bem-sucedida.
+     */
     public boolean deleteContract(int id) {
         Connection conn = null;
         try {
             conn = Conexao.getConexao();
-            conn.setAutoCommit(false); // Inicia transação
-            // Exclui dependências manualmente para evitar erro de FK Constraints
+            conn.setAutoCommit(false);
             conn.createStatement().executeUpdate("DELETE FROM Installments WHERE cdcontract = " + id);
             conn.createStatement().executeUpdate("DELETE FROM User_Contract WHERE cdcontract = " + id);
             conn.createStatement().executeUpdate("DELETE FROM Commissions WHERE cdcontract = " + id);
@@ -297,5 +442,35 @@ public class ContractDAO {
         } finally {
             if (conn != null) try { conn.setAutoCommit(true); conn.close(); } catch (SQLException ex) {}
         }
+    }
+
+    /**
+     * Lista todos os contratos cadastrados no sistema.
+     * 
+     * @return Lista de objetos Contracts.
+     */
+    public java.util.List<Contracts> findAllActive() {
+        java.util.List<Contracts> list = new java.util.ArrayList<>();
+        String sql = "SELECT * FROM Contracts";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                Contracts c = new Contracts();
+                c.setCdcontract(rs.getInt("cdcontract"));
+                if (rs.getDate("dtcreation") != null) c.setDtcreation(rs.getDate("dtcreation").toLocalDate());
+                c.setDstitle(rs.getString("dstitle"));
+                c.setCdtemplate(rs.getInt("cdtemplate"));
+                c.setCdproperty(rs.getInt("cdproperty"));
+                c.setCdindex(rs.getInt("cdindex"));
+                if (rs.getDate("dtlimit") != null) c.setDtlimit(rs.getDate("dtlimit").toLocalDate());
+                c.setCdstatus(rs.getInt("cdstatus"));
+                c.setCdnotary(rs.getInt("cdnotary"));
+                list.add(c);
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao buscar contratos ativos: " + e.getMessage());
+        }
+        return list;
     }
 }

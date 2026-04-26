@@ -5,8 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para a entidade de Endereços.
+ */
 public class AddressDAO {
 
+    /**
+     * Insere um novo endereço no banco de dados.
+     * 
+     * @param a Objeto contendo os dados do endereço.
+     */
     public void insert(Addresses a) {
         String sql = "INSERT INTO Addresses (cdzipcode, nmstreet, nraddress, dscomplement, cddistrict) VALUES (?, ?, ?, ?, ?)";
         try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
@@ -23,6 +31,12 @@ public class AddressDAO {
         } catch (SQLException e) { System.err.println("Erro ao inserir endereço: " + e.getMessage()); }
     }
 
+    /**
+     * Busca um endereço pelo seu identificador.
+     * 
+     * @param id Identificador do endereço.
+     * @return Objeto Addresses ou null se não encontrado.
+     */
     public Addresses findById(int id) {
         String sql = "SELECT * FROM Addresses WHERE cdaddress = ?";
         try (Connection conn = Conexao.getConexao();
@@ -44,6 +58,11 @@ public class AddressDAO {
         return null;
     }
 
+    /**
+     * Lista todos os endereços cadastrados.
+     * 
+     * @return Lista de objetos Addresses.
+     */
     public List<Addresses> listAll() {
         List<Addresses> list = new ArrayList<>();
         String sql = "SELECT * FROM Addresses ORDER BY cdaddress";
@@ -62,6 +81,11 @@ public class AddressDAO {
         return list;
     }
 
+    /**
+     * Lista todos os endereços com formatação legível incluindo o bairro.
+     * 
+     * @return Lista de Strings formatadas.
+     */
     public List<String> listAllFormatted() {
         List<String> list = new ArrayList<>();
         String sql = "SELECT a.cdaddress, a.nmstreet, a.nraddress, d.nmdistrict " +
@@ -85,6 +109,11 @@ public class AddressDAO {
         return list;
     }
 
+    /**
+     * Atualiza os dados de um endereço existente.
+     * 
+     * @param a Objeto contendo os novos dados do endereço.
+     */
     public void update(Addresses a) {
         String sql = "UPDATE Addresses SET cdzipcode=?, nmstreet=?, nraddress=?, dscomplement=?, cddistrict=? WHERE cdaddress=?";
         try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -93,6 +122,12 @@ public class AddressDAO {
         } catch (SQLException e) { e.printStackTrace(); }
     }
 
+    /**
+     * Exclui um endereço pelo seu identificador.
+     * 
+     * @param id Identificador do endereço.
+     * @return true se a exclusão foi bem-sucedida.
+     */
     public boolean delete(int id) {
         String sql = "DELETE FROM Addresses WHERE cdaddress = ?";
         try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {

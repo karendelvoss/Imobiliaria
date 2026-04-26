@@ -2,79 +2,83 @@ package view;
 
 import dao.PropertyDAO;
 import service.ReportService;
+import static view.ConsoleIO.*;
+import dao.ContractDAO;
 
-import static view.ConsoleIO.lerInt;
-import static view.ConsoleIO.lerIntSeguro;
-import java.util.Scanner;
-
-/** Menu de relatórios. Delega a geração aos serviços especializados. */
+/**
+ * Tela de acesso aos diversos relatórios do sistema.
+ */
 public class ReportView {
 
     private final PropertyDAO propertyDAO;
     private final ReportService reportService;
+    private final ContractDAO contractDAO;
 
     public ReportView(PropertyDAO propertyDAO, ReportService reportService) {
         this.propertyDAO = propertyDAO;
         this.reportService = reportService;
+        this.contractDAO = new ContractDAO();
     }
 
+    /**
+     * Menu de seleção de relatórios.
+     */
     public void menu() {
         System.out.println("\n--- MÓDULO DE RELATÓRIOS ---");
         System.out.println("1. Imóveis por Bairro");
         System.out.println("2. Relatório Financeiro de Locação");
         System.out.println("3. Relatório Financeiro de Venda");
         System.out.println("4. Relatório de Partes do Contrato");
-        System.out.println("5. Relatório de Reajustes do Mês");
+        System.out.println("5. Relatório de Reajustes do Ano");
         System.out.println("6. Listagem Geral (JOINS)");
+        System.out.println("7. Fluxo de Caixa Mensal e Adimplência");
+        
         switch (lerIntSeguro("Escolha: ")) {
             case 1: propertyDAO.relatorioImoveisPorBairro(); break;
             case 2: 
-                if (perguntarEListarContratos("locação")) {
-                    reportService.gerarRelatorioFinanceiroLocacao(lerInt("ID Contrato: ")); 
-                }
+                int idLoc = lerIdValido("ID do Contrato de Locação", 
+                    contractDAO::findById, 
+                    () -> contractDAO.getActiveContractsList("locação").forEach(System.out::println));
+                if (idLoc > 0) reportService.gerarRelatorioFinanceiroLocacao(idLoc);
                 break;
             case 3: 
-                if (perguntarEListarContratos("venda")) {
-                    reportService.gerarRelatorioFinanceiroVenda(lerInt("ID Contrato: ")); 
-                }
+                int idVen = lerIdValido("ID do Contrato de Venda", 
+                    contractDAO::findById, 
+                    () -> contractDAO.getActiveContractsList("venda").forEach(System.out::println));
+                if (idVen > 0) reportService.gerarRelatorioFinanceiroVenda(idVen);
                 break;
             case 4: 
-                if (perguntarEListarContratos("geral")) {
-                    reportService.gerarRelatorioPartesContrato(lerInt("ID Contrato: ")); 
-                }
+                int idPart = lerIdValido("ID do Contrato (Partes)", 
+                    contractDAO::findById, 
+                    () -> contractDAO.getActiveContractsList("geral").forEach(System.out::println));
+                if (idPart > 0) reportService.gerarRelatorioPartesContrato(idPart);
                 break;
             case 5:
                 System.out.println("\nBuscando reajustes previstos para o mês atual...");
                 reportService.gerarRelatorioReajustesDoMes();
                 break;
             case 6: propertyDAO.relatorioCompletoImoveis(); break;
-        }
-    }
-
-    private boolean perguntarEListarContratos(String tipo) {
-        @SuppressWarnings("resource")
-        Scanner sc = new Scanner(System.in);
-        System.out.print("Ver contratos de " + tipo + " disponíveis para consulta? (s/n): ");
-        String resp = sc.next().trim().toLowerCase();
-        
-        if (resp.equals("s")) {
-            dao.ContractDAO contractDAO = new dao.ContractDAO();
-            java.util.List<String> contratos = contractDAO.getActiveContractsList(tipo);
-            
-            System.out.println("\n--- CONTRATOS DISPONÍVEIS ---");
-            if (contratos.isEmpty()) {
-                System.out.println("Nenhum contrato encontrado no sistema.");
-                System.out.println("-----------------------------\n");
-                return false; // Aborta e volta pro menu imediatamente
-            } else {
-                for (String c : contratos) {
-                    System.out.println(c);
+            case 7:
+                System.out.println("\nMODO DO RELATÓRIO DE FLUXO DE CAIXA:");
+                System.out.println("1. Visão Geral (Todos os Contratos)");
+                System.out.println("2. Visão de Contrato Específico");
+                int modo = lerIntSeguro("Escolha o modo: ");
+                
+                int contractId = 0;
+                if (modo == 2) {
+                    contractId = lerIdValido("ID do Contrato para análise", 
+                        contractDAO::findById, 
+                        () -> contractDAO.getActiveContractsList("geral").forEach(System.out::println));
+                    if (contractId <= 0) break;
                 }
-            }
-            System.out.println("-----------------------------\n");
-            return true;
+                
+                int year = lerIntSeguro("Digite o ano de referência (ex: 2026): ");
+                if (year > 0) {
+                    reportService.gerarRelatorioFluxoCaixa(year, contractId);
+                } else {
+                    System.out.println("Ano inválido.");
+                }
+                break;
         }
-        
-        return false; // Se a resposta for "n" (ou qualquer outra letra), cancela e volta.
     }
 }

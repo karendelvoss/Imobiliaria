@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para os índices financeiros.
+ */
 public class IndexDAO {
+
+    /**
+     * Insere um novo índice financeiro.
+     * 
+     * @param idx Objeto contendo os dados do índice.
+     */
     public void insert(Indexes idx) {
         String sql = "INSERT INTO Indexes (nmindex) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
@@ -21,6 +30,12 @@ public class IndexDAO {
         }
     }
 
+    /**
+     * Busca um índice financeiro pelo ID.
+     * 
+     * @param id Identificador do índice.
+     * @return Objeto Indexes ou null.
+     */
     public Indexes findById(int id) {
         String sql = "SELECT * FROM Indexes WHERE cdindex = ?";
         try (Connection conn = Conexao.getConexao();
@@ -40,6 +55,11 @@ public class IndexDAO {
         return null;
     }
 
+    /**
+     * Lista todos os índices financeiros cadastrados.
+     * 
+     * @return Lista de objetos Indexes.
+     */
     public List<Indexes> listAll() {
         List<Indexes> list = new ArrayList<>();
         String sql = "SELECT * FROM Indexes";
@@ -58,6 +78,11 @@ public class IndexDAO {
         return list;
     }
 
+    /**
+     * Atualiza os dados de um índice financeiro.
+     * 
+     * @param idx Objeto contendo os dados atualizados.
+     */
     public void update(Indexes idx) {
         String sql = "UPDATE Indexes SET nmindex=? WHERE cdindex=?";
         try (Connection conn = Conexao.getConexao();
@@ -70,13 +95,18 @@ public class IndexDAO {
         }
     }
 
+    /**
+     * Exclui um índice financeiro pelo seu identificador.
+     * 
+     * @param id Identificador do índice.
+     * @return true se excluído com sucesso.
+     */
     public boolean delete(int id) {
         String sql = "DELETE FROM Indexes WHERE cdindex = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            int rows = ps.executeUpdate();
-            return rows > 0;
+            return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("Erro ao excluir índice: " + e.getMessage());
             return false;

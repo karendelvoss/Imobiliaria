@@ -4,9 +4,7 @@ import dao.*;
 import service.ReportService;
 
 /**
- * Ponto de entrada da aplicação.
- * Responsabilidade: construir as dependências (DAOs/serviços),
- * injetá-las nas views especializadas e orquestrar o menu principal.
+ * Ponto de entrada principal do sistema imobiliário.
  */
 public class Main {
 
@@ -27,8 +25,12 @@ public class Main {
         this.occupationView = occupationView;
     }
 
+    /**
+     * Inicializa a aplicação e suas dependências.
+     * 
+     * @param args Argumentos de linha de comando.
+     */
     public static void main(String[] args) {
-        // Composição de dependências (Composition Root)
         UserDAO userDAO = new UserDAO();
         PropertyDAO propertyDAO = new PropertyDAO();
         ContractDAO contractDAO = new ContractDAO();
@@ -49,12 +51,17 @@ public class Main {
                 templateDAO, new ClauseDAO(), indexDAO, new RoleDAO(),
                 new BankAccountDAO(), new NotificationDAO(),
                 topicDAO, variableDAO, commissionDAO, brokerDataDAO,
-                stateDAO, addressDAO, indexRateDAO, userDAO, contractDAO);
+                stateDAO, addressDAO, indexRateDAO, userDAO, contractDAO,
+                new InstallmentDAO(), new UserContractDAO(), new NotaryDAO(), occupationDAO);
 
+        UserView uv = new UserView(userDAO);
+        PropertyView pv = new PropertyView(propertyDAO, userDAO, uv);
+        InstallmentDAO installmentDAO = new InstallmentDAO();
+        
         Main app = new Main(
-                new UserView(userDAO),
-                new PropertyView(propertyDAO),
-                new ContractView(contractDAO, propertyDAO, userDAO, templateDAO, indexDAO, topicDAO),
+                uv,
+                pv,
+                new ContractView(contractDAO, propertyDAO, userDAO, templateDAO, indexDAO, topicDAO, uv, pv, installmentDAO, new BankAccountDAO(), new UserContractDAO(), addressDAO, new DistrictDAO(), new CityDAO(), variableDAO, new ClauseDAO(), new NotaryDAO(), occupationDAO),
                 domainView,
                 new ReportView(propertyDAO, new ReportService()),
                 new OccupationView(occupationDAO));
@@ -62,6 +69,9 @@ public class Main {
         app.executar();
     }
 
+    /**
+     * Inicia o loop principal do menu do sistema.
+     */
     public void executar() {
         int modulo = 0;
         while (modulo != 9) {

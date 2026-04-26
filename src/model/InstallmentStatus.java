@@ -1,13 +1,12 @@
 package model;
 
 /**
- * Enum para representar os status de uma parcela de forma segura e legível.
- * Evita o uso de "magic numbers" no código.
+ * Define os status possíveis para uma parcela (Installments).
  */
 public enum InstallmentStatus {
     PENDENTE(1, "Pendente"),
     PAGO(2, "Pago"),
-    ATRASADO(3, "Atrasado"), // Status lógico para relatórios, pode não existir no banco
+    ATRASADO(3, "Atrasado"),
     CANCELADO(4, "Cancelado");
 
     private final int code;
@@ -18,14 +17,24 @@ public enum InstallmentStatus {
         this.description = description;
     }
 
-    public int getCode() { return code; }
-    public String getDescription() { return description; }
+    public int getCode() {
+        return code;
+    }
 
+    public String getDescription() {
+        return description;
+    }
+
+    /**
+     * Retorna o enum correspondente ao código informado.
+     * 
+     * @param code Código do status.
+     * @return InstallmentStatus correspondente.
+     */
     public static InstallmentStatus fromCode(int code) {
         for (InstallmentStatus status : InstallmentStatus.values()) {
             if (status.getCode() == code) return status;
         }
-        // Retorna PENDENTE como padrão para evitar quebrar se um status inesperado for encontrado
         return PENDENTE;
     }
 }

@@ -3,6 +3,7 @@ package view;
 import dao.Conexao;
 import dao.PropertyDAO;
 import model.Properties;
+import dao.UserDAO;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -12,15 +13,24 @@ import java.sql.Statement;
 
 import static view.ConsoleIO.*;
 
-/** Fluxos de UI para a entidade Imóvel. */
+/**
+ * Interface de console para gestão de imóveis.
+ */
 public class PropertyView {
 
     private final PropertyDAO propertyDAO;
+    private final UserDAO userDAO;
+    private final UserView userView;
 
-    public PropertyView(PropertyDAO propertyDAO) {
+    public PropertyView(PropertyDAO propertyDAO, UserDAO userDAO, UserView userView) {
         this.propertyDAO = propertyDAO;
+        this.userDAO = userDAO;
+        this.userView = userView;
     }
 
+    /**
+     * Menu principal para operações com imóveis.
+     */
     public void menu() {
         System.out.println("\n--- SUBMENU: IMÓVEIS ---");
         System.out.println("1. Cadastrar 2. Consultar 3. Atualizar 4. Excluir");
@@ -33,7 +43,12 @@ public class PropertyView {
         }
     }
 
-    private void cadastrar() {
+    /**
+     * Fluxo de cadastro de um novo imóvel.
+     * 
+     * @return ID do imóvel criado ou -1 se cancelado.
+     */
+    public int cadastrar() {
         System.out.println("\n--- CADASTRAR IMÓVEL ---");
         Properties p = new Properties();
         p.setNrregistration(ler("Matrícula: "));
@@ -41,22 +56,45 @@ public class PropertyView {
         p.setVltotalarea(lerDouble("Área Total (m²): "));
 
         int idAddress = lerIdValido("ID Endereço", id -> checkExists("Addresses", "cdaddress", id) ? id : null, this::listAddresses);
-        if (idAddress == -1) { System.out.println("Cadastro cancelado."); return; }
+        if (idAddress == -1) { System.out.println("Cadastro cancelado."); return -1; }
         p.setCdaddress(idAddress);
 
         int idType = lerIdValido("ID Tipo", id -> checkExists("Property_Types", "cdtype", id) ? id : null, this::listPropertyTypes);
-        if (idType == -1) { System.out.println("Cadastro cancelado."); return; }
+        if (idType == -1) { System.out.println("Cadastro cancelado."); return -1; }
         p.setCdtype(idType);
 
         int idPurpose = lerIdValido("ID Finalidade", id -> checkExists("Property_Purposes", "cdpurpose", id) ? id : null, this::listPropertyPurposes);
-        if (idPurpose == -1) { System.out.println("Cadastro cancelado."); return; }
+        if (idPurpose == -1) { System.out.println("Cadastro cancelado."); return -1; }
         p.setCdpurpose(idPurpose);
 
         int idStatus = lerIdValido("ID Status", id -> checkExists("Property_Status", "cdstatus", id) ? id : null, this::listPropertyStatus);
-        if (idStatus == -1) { System.out.println("Cadastro cancelado."); return; }
+        if (idStatus == -1) { System.out.println("Cadastro cancelado."); return -1; }
         p.setCdstatus(idStatus);
 
-        propertyDAO.insertProperty(p);
+        int idProperty = propertyDAO.insertProperty(p);
+        if (idProperty > 0) {
+            vincularProprietarioObrigatorio(idProperty);
+        }
+        return idProperty;
+    }
+
+    private void vincularProprietarioObrigatorio(int idProperty) {
+        System.out.println("\n--- VÍNCULO OBRIGATÓRIO DE PROPRIETÁRIO ---");
+        System.out.println("Todo imóvel recém-cadastrado deve ter pelo menos um proprietário vinculado.");
+        
+        int idUser = lerIdValido("ID do Proprietário/Usuário",
+            userDAO::findById,
+            () -> userDAO.getAllUsersList().forEach(System.out::println),
+            () -> userView.cadastrar()
+        );
+
+        if (idUser > 0) {
+            propertyDAO.linkOwner(idProperty, idUser);
+            System.out.println("Proprietário vinculado com sucesso!");
+        } else {
+            // Se o usuário cancelar com 0, o sistema avisa mas permite continuar (ou podemos travar num loop se for 100% obrigatório)
+            System.out.println("AVISO: O imóvel ficou sem proprietário vinculado. Recomenda-se realizar o vínculo manualmente depois.");
+        }
     }
 
     private void consultar() {
@@ -111,10 +149,9 @@ public class PropertyView {
     }
 
     private void mostrarExcluiveis() {
-        propertyDAO.getAvailableOnly().forEach(System.out::println);
+        System.out.println("\n--- IMÓVEIS APTOS PARA EXCLUSÃO (DISPONÍVEIS) ---");
+        propertyDAO.getAvailableProperties().forEach(System.out::println);
     }
-
-    // --- MÉTODOS AUXILIARES DE VALIDAÇÃO E LISTAGEM ---
 
     private boolean checkExists(String tableName, String idColumnName, int id) {
         String sql = "SELECT 1 FROM " + tableName + " WHERE " + idColumnName + " = ?";
@@ -124,7 +161,9 @@ public class PropertyView {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
-        } catch (SQLException e) { return false; }
+        } catch (SQLException e) {
+            return false;
+        }
     }
 
     private void listAddresses() {

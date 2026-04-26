@@ -5,8 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para a entidade de Profissões (Occupations).
+ */
 public class OccupationDAO {
 
+    /**
+     * Insere uma nova profissão no banco de dados.
+     * 
+     * @param occ Objeto contendo os dados da profissão.
+     */
     public void save(Occupations occ) {
         String sql = "INSERT INTO Occupations (nmoccupation) VALUES (?)";
         try (Connection conn = Conexao.getConexao();
@@ -22,6 +30,12 @@ public class OccupationDAO {
         }
     }
 
+    /**
+     * Busca uma profissão pelo seu identificador.
+     * 
+     * @param id Identificador da profissão.
+     * @return Objeto Occupations ou null.
+     */
     public Occupations findById(int id) {
         String sql = "SELECT * FROM Occupations WHERE cdoccupation = ?";
         try (Connection conn = Conexao.getConexao();
@@ -41,6 +55,11 @@ public class OccupationDAO {
         return null;
     }
 
+    /**
+     * Lista todas as profissões cadastradas de forma formatada.
+     * 
+     * @return Lista de Strings contendo ID e Nome das profissões.
+     */
     public List<String> listAll() {
         List<String> list = new ArrayList<>();
         String sql = "SELECT * FROM Occupations ORDER BY nmoccupation";
@@ -56,6 +75,11 @@ public class OccupationDAO {
         return list;
     }
 
+    /**
+     * Atualiza o nome de uma profissão existente.
+     * 
+     * @param occ Objeto contendo o ID e o novo nome da profissão.
+     */
     public void update(Occupations occ) {
         String sql = "UPDATE Occupations SET nmoccupation = ? WHERE cdoccupation = ?";
         try (Connection conn = Conexao.getConexao();
@@ -71,6 +95,11 @@ public class OccupationDAO {
         }
     }
 
+    /**
+     * Exclui uma profissão pelo seu identificador.
+     * 
+     * @param id Identificador da profissão.
+     */
     public void delete(int id) {
         String sql = "DELETE FROM Occupations WHERE cdoccupation = ?";
         try (Connection conn = Conexao.getConexao();

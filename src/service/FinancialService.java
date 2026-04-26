@@ -6,34 +6,32 @@ import model.Index_Rates;
 import model.InstallmentStatus;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import dao.InstallmentDAO;
+import dao.ReadjustmentLogDAO;
+import model.Contracts;
+import model.ReadjustmentLog;
 
 /**
- * Camada de Serviço para Lógicas de Negócio Financeiras.
- * Responsável por orquestrar DAOs e aplicar regras de negócio
- * como juros, multas e reajustes, mantendo o código limpo e
- * desacoplado da camada de acesso a dados (DAO) e da apresentação (View).
+ * Serviço responsável por lógicas de negócio financeiras, incluindo cálculo de multas, juros e reajustes por inflação.
  */
 public class FinancialService {
 
-    // Constantes para as regras de juros e multa (boa prática - Sonar)
-    // RF006: Multa de 2% sobre o valor base por atraso.
-    private static final double LATE_FEE_PERCENTAGE = 0.02; 
-    // RF006: Juros de 0.033% ao dia.
-    private static final double DAILY_INTEREST_PERCENTAGE = 0.00033; 
     private final IndexRateDAO indexRateDAO;
+    private final InstallmentDAO installmentDAO;
+    private final ReadjustmentLogDAO readjustmentLogDAO;
 
     public FinancialService() {
         this.indexRateDAO = new IndexRateDAO();
+        this.installmentDAO = new InstallmentDAO();
+        this.readjustmentLogDAO = new ReadjustmentLogDAO();
     }
 
     /**
-     * RF006 - Calcula juros e multa para uma parcela de locação em atraso.
-     * A lógica é aplicada se a data de vencimento for anterior à data atual
-     * e a parcela ainda estiver com status "Pendente".
-     *
-     * @param installment A parcela a ser calculada.
-     * @return A própria parcela com o campo 'vladjusted' atualizado. 
-     *         Retorna a parcela sem modificação se não estiver em atraso.
+     * Calcula juros e multa para uma parcela em atraso.
+     * 
+     * @param installment Objeto da parcela.
+     * @return Parcela com o campo vladjusted atualizado, se aplicável.
      */
     public Installments calculateLateFeesAndInterest(Installments installment) {
         // Verifica se a parcela está em atraso e pendente de pagamento
@@ -42,8 +40,8 @@ public class FinancialService {
             long overdueDays = ChronoUnit.DAYS.between(installment.getDtdue(), LocalDate.now());
             if (overdueDays <= 0) return installment;
 
-            double penalty = installment.getVlbase() * LATE_FEE_PERCENTAGE;
-            double interest = (installment.getVlbase() * DAILY_INTEREST_PERCENTAGE) * overdueDays;
+            double penalty = installment.getVlbase() * installment.getVlpenalty();
+            double interest = (installment.getVlbase() * installment.getVlinterest()) * overdueDays;
             double newTotalValue = installment.getVlbase() + penalty + interest;
             installment.setVladjusted(newTotalValue);
 
@@ -55,28 +53,93 @@ public class FinancialService {
     }
 
     /**
-     * RF007 - Aplica o reajuste anual a uma parcela com base em um índice. (Implementação futura)
+     * Aplica o reajuste anual a uma parcela com base no índice financeiro acumulado de 12 meses.
+     * 
+     * @param installment Objeto da parcela.
+     * @param cdindex Identificador do índice financeiro.
+     * @return Parcela com o valor reajustado em memória.
      */
     public Installments applyInflationAdjustment(Installments installment, int cdindex) {
-        // 1. Busca a taxa mais recente para o índice do contrato
-        Index_Rates latestRate = indexRateDAO.findLatestById(cdindex);
+        LocalDate baseDate = LocalDate.now();
+        // Busca as taxas dos últimos 12 meses
+        List<Index_Rates> rates = indexRateDAO.findLast12MonthsRates(cdindex, baseDate);
 
-        // 2. Verifica se a taxa existe e se a parcela está pendente
-        if (latestRate != null && installment.getCdstatus() == InstallmentStatus.PENDENTE.getCode()) {
+        // Fallback de Índice: Se encontrar 11, busca a janela imediatamente anterior com 12 meses
+        if (rates.size() == 11) {
+            System.out.println("Fallback de Índice acionado: Último mês não homologado. Deslocando janela em 1 mês.");
+            baseDate = baseDate.minusMonths(1);
+            rates = indexRateDAO.findLast12MonthsRates(cdindex, baseDate);
+        }
+
+        // Alerta de Vacância
+        if (!rates.isEmpty()) {
+            Index_Rates lastRate = rates.get(rates.size() - 1);
+            LocalDate lastRateDate = LocalDate.of(lastRate.getRefyear(), lastRate.getRefmonth(), 1);
+            LocalDate endOfRateMonth = lastRateDate.withDayOfMonth(lastRateDate.lengthOfMonth());
+            long defasagem = ChronoUnit.DAYS.between(endOfRateMonth, LocalDate.now());
             
-            // REGRA DE NEGÓCIO: Aplicar o reajuste apenas uma vez.
-            // Verificamos se a parcela já foi reajustada.
-            if (installment.getDtlastadjustment() == null) {
-                double rateValue = latestRate.getVlrate(); // Ex: 0.0045
-                double adjustedValue = installment.getVlbase() * (1 + rateValue);
+            if (defasagem > 45) {
+                System.err.println("ALERTA DE VACÂNCIA: A base de índices está defasada em " + defasagem + " dias (mais de 45 dias).");
+            }
+        }
+
+        if (rates.size() == 12 && installment.getCdstatus() == InstallmentStatus.PENDENTE.getCode()) {
+            if (installment.getDtlastadjustment() == null || 
+                ChronoUnit.MONTHS.between(installment.getDtlastadjustment(), LocalDate.now()) >= 11) {
+                
+                double accumulatedRate = 1.0;
+                for (Index_Rates rate : rates) {
+                    accumulatedRate *= (1 + rate.getVlrate());
+                }
+                
+                // Ex: V_novo = V_antigo * PROD(1 + i_t)
+                double currentValue = installment.getVladjusted() > 0 ? installment.getVladjusted() : installment.getVlbase();
+                double adjustedValue = currentValue * accumulatedRate;
                 
                 installment.setVladjusted(adjustedValue);
-                installment.setDtlastadjustment(LocalDate.now()); // Marca a data do reajuste
-
-                System.out.printf("REAJUSTE APLICADO: Parcela #%d | Taxa: %.4f%% | Valor Corrigido: R$%.2f\n",
-                    installment.getNrinstallment(), rateValue * 100, adjustedValue);
+                // Não salva no banco, apenas memória
             }
         }
         return installment;
+    }
+
+    /**
+     * Aplica o reajuste em uma parcela, persiste no banco de dados e gera o log de auditoria.
+     * 
+     * @param contract Objeto do contrato associado.
+     * @param installment Objeto da parcela.
+     */
+    public void applyAndPersistAdjustment(Contracts contract, Installments installment) {
+        if (installment.getCdstatus() != InstallmentStatus.PENDENTE.getCode()) {
+            return;
+        }
+
+        double oldVal = installment.getVladjusted() > 0 ? installment.getVladjusted() : installment.getVlbase();
+        
+        // Simula o ajuste na memória
+        Installments simulated = applyInflationAdjustment(installment, contract.getCdindex());
+        
+        if (simulated.getVladjusted() > oldVal) {
+            double newVal = simulated.getVladjusted();
+            
+            // Atualiza a parcela
+            installment.setVladjusted(newVal);
+            installment.setDtlastadjustment(LocalDate.now());
+            installmentDAO.update(installment);
+            
+            // Grava o log de auditoria
+            ReadjustmentLog log = new ReadjustmentLog();
+            log.setCdcontract(contract.getCdcontract());
+            log.setCdinstallment(installment.getCdinstallment());
+            log.setCdindex(contract.getCdindex());
+            log.setVlold(oldVal);
+            log.setVlnew(newVal);
+            log.setDtreadjustment(LocalDate.now());
+            
+            readjustmentLogDAO.insert(log);
+            
+            System.out.printf("REAJUSTE SALVO: Contrato #%d | Parcela #%d | Velho: R$%.2f | Novo: R$%.2f\n",
+                contract.getCdcontract(), installment.getNrinstallment(), oldVal, newVal);
+        }
     }
 }

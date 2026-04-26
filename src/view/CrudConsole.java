@@ -8,15 +8,15 @@ import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
 /**
- * Menu CRUD genérico para qualquer entidade. Isola o fluxo repetitivo de
- * Novo/Listar/Atualizar/Excluir, permitindo que cada view auxiliar declare
- * apenas como criar, editar e imprimir sua entidade.
+ * Utilitário genérico para execução de operações CRUD via console.
  */
 public final class CrudConsole {
 
     private CrudConsole() {}
 
-    /** Contrato mínimo que os DAOs auxiliares satisfazem. */
+    /**
+     * Interface simplificada para operações CRUD.
+     */
     public interface SimpleCrud<T> {
         void insert(T t);
         void update(T t);
@@ -24,7 +24,15 @@ public final class CrudConsole {
         List<T> listAll();
     }
 
-    /** Adapta method references de um DAO concreto ao contrato {@link SimpleCrud}. */
+    /**
+     * Adapta referências de métodos para a interface SimpleCrud.
+     * 
+     * @param insert Função de inserção.
+     * @param update Função de atualização.
+     * @param delete Função de exclusão.
+     * @param listAll Função de listagem.
+     * @return Implementação de SimpleCrud.
+     */
     public static <T> SimpleCrud<T> adapt(Consumer<T> insert, Consumer<T> update,
                                           IntConsumer delete, Supplier<List<T>> listAll) {
         return new SimpleCrud<T>() {
@@ -36,21 +44,22 @@ public final class CrudConsole {
     }
 
     /**
-     * Executa o menu CRUD padrão para uma entidade.
-     *
-     * @param titulo       Título do submenu
-     * @param fabricaNovo  Fornece uma nova entidade já preenchida via prompts
-     * @param editor       Atualiza os campos da entidade existente via prompts
-     * @param finder       Busca entidade por ID
-     * @param impressora   Converte entidade em string para listagem
-     * @param dao          Operações de persistência
+     * Executa o fluxo de menu CRUD para uma determinada entidade.
+     * 
+     * @param titulo Título do menu.
+     * @param fabricaNovo Fornecedor de nova instância da entidade.
+     * @param editor Consumidor para edição da entidade.
+     * @param finder Função de busca por ID.
+     * @param impressora Função de formatação para exibição.
+     * @param dao Implementação de SimpleCrud.
      */
     public static <T> void run(String titulo,
                                Supplier<T> fabricaNovo,
                                Consumer<T> editor,
                                IntFunction<T> finder,
                                Function<T, String> impressora,
-                               SimpleCrud<T> dao) {
+                               SimpleCrud<T> dao
+                            ) {
         System.out.println("\n[" + titulo + "] 1.Novo 2.Listar 3.Atualizar 4.Excluir 0.Voltar");
         int op = ConsoleIO.lerIntSeguro("Escolha: ");
         try {

@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para contas bancárias.
+ */
 public class BankAccountDAO {
+
+    /**
+     * Insere uma nova conta bancária.
+     * 
+     * @param ba Objeto contendo os dados da conta.
+     */
     public void insert(Bank_Accounts ba) {
         String sql = "INSERT INTO Bank_Accounts (nragency, nraccount, nrpixkey, cduser) VALUES (?, ?, ?, ?)";
         try (Connection conn = Conexao.getConexao();
@@ -24,6 +33,12 @@ public class BankAccountDAO {
         }
     }
 
+    /**
+     * Busca uma conta bancária pelo ID.
+     * 
+     * @param id Identificador da conta.
+     * @return Objeto Bank_Accounts ou null.
+     */
     public Bank_Accounts findById(int id) {
         String sql = "SELECT * FROM Bank_Accounts WHERE cdbankaccount = ?";
         try (Connection conn = Conexao.getConexao();
@@ -46,6 +61,39 @@ public class BankAccountDAO {
         return null;
     }
 
+    /**
+     * Busca a conta bancária vinculada a um usuário.
+     * 
+     * @param userId Identificador do usuário.
+     * @return Objeto Bank_Accounts ou null.
+     */
+    public Bank_Accounts findByUserId(int userId) {
+        String sql = "SELECT * FROM Bank_Accounts WHERE cduser = ? LIMIT 1";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Bank_Accounts ba = new Bank_Accounts();
+                    ba.setCdbankaccount(rs.getInt("cdbankaccount"));
+                    ba.setNragency(rs.getString("nragency"));
+                    ba.setNraccount(rs.getString("nraccount"));
+                    ba.setNrpixkey(rs.getString("nrpixkey"));
+                    ba.setCduser(rs.getInt("cduser"));
+                    return ba;
+                }
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    /**
+     * Lista todas as contas bancárias cadastradas.
+     * 
+     * @return Lista de contas bancárias.
+     */
     public List<Bank_Accounts> listAll() {
         List<Bank_Accounts> list = new ArrayList<>();
         String sql = "SELECT * FROM Bank_Accounts ORDER BY cdbankaccount";
@@ -67,6 +115,11 @@ public class BankAccountDAO {
         return list;
     }
 
+    /**
+     * Atualiza uma conta bancária.
+     * 
+     * @param ba Objeto contendo os dados atualizados.
+     */
     public void update(Bank_Accounts ba) {
         String sql = "UPDATE Bank_Accounts SET nragency=?, nraccount=?, nrpixkey=?, cduser=? WHERE cdbankaccount=?";
         try (Connection conn = Conexao.getConexao();
@@ -82,13 +135,18 @@ public class BankAccountDAO {
         }
     }
 
+    /**
+     * Exclui uma conta bancária.
+     * 
+     * @param id Identificador da conta.
+     * @return true se excluída com sucesso.
+     */
     public boolean delete(int id) {
         String sql = "DELETE FROM Bank_Accounts WHERE cdbankaccount = ?";
         try (Connection conn = Conexao.getConexao();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, id);
-            int rows = ps.executeUpdate();
-            return rows > 0;
+            return ps.executeUpdate() > 0;
         } catch (SQLException e) {
             System.err.println("Erro ao excluir conta bancária: " + e.getMessage());
             return false;

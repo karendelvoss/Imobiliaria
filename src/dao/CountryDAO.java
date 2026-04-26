@@ -5,7 +5,16 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Gerencia as operações de persistência para a entidade de Países.
+ */
 public class CountryDAO {
+
+    /**
+     * Insere um novo país no banco de dados.
+     * 
+     * @param c Objeto contendo os dados do país.
+     */
     public void insert(Countries c) {
         String sqlInsert = "INSERT INTO Countries (nmcountry, sgcountry) VALUES (?, ?)";
         try (Connection conn = Conexao.getConexao();
@@ -22,6 +31,12 @@ public class CountryDAO {
         }
     }
 
+    /**
+     * Busca um país pelo seu identificador.
+     * 
+     * @param id Identificador do país.
+     * @return Objeto Countries ou null.
+     */
     public Countries findById(int id) {
         String sql = "SELECT * FROM Countries WHERE cdcountry = ?";
         try (Connection conn = Conexao.getConexao();
@@ -42,6 +57,11 @@ public class CountryDAO {
         return null;
     }
 
+    /**
+     * Lista todos os países cadastrados.
+     * 
+     * @return Lista de objetos Countries.
+     */
     public List<Countries> listAll() {
         List<Countries> list = new ArrayList<>();
         String sql = "SELECT * FROM Countries";
@@ -61,6 +81,11 @@ public class CountryDAO {
         return list;
     }
 
+    /**
+     * Atualiza os dados de um país existente.
+     * 
+     * @param c Objeto contendo os dados atualizados.
+     */
     public void update(Countries c) {
         String sql = "UPDATE Countries SET nmcountry=?, sgcountry=? WHERE cdcountry=?";
         try (Connection conn = Conexao.getConexao();
@@ -74,6 +99,11 @@ public class CountryDAO {
         }
     }
 
+    /**
+     * Exclui um país pelo seu identificador.
+     * 
+     * @param id Identificador do país.
+     */
     public void delete(int id) {
         String sql = "DELETE FROM Countries WHERE cdcountry = ?";
         try (Connection conn = Conexao.getConexao();

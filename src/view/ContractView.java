@@ -1,16 +1,28 @@
 package view;
 
+import dao.BankAccountDAO;
 import dao.ContractDAO;
 import dao.ContractTemplateDAO;
 import dao.IndexDAO;
+import dao.AddressDAO;
+import dao.CityDAO;
+import dao.ClauseDAO;
+import dao.DistrictDAO;
+import dao.InstallmentDAO;
+import dao.NotaryDAO;
+import dao.OccupationDAO;
 import dao.PropertyDAO;
 import dao.TopicDAO;
+import dao.UserContractDAO;
 import dao.UserDAO;
+import dao.VariableDAO;
+import model.Bank_Accounts;
 import model.Contracts;
 import model.Installments;
 import model.Properties;
 import model.SignatureStatus;
 import model.User_Contract;
+import model.ContractRenewalType;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -18,7 +30,9 @@ import java.util.List;
 
 import static view.ConsoleIO.*;
 
-/** Processos de negócio envolvendo contratos e vínculos proprietário/imóvel. */
+/**
+ * Interface de console para processos de negócio complexos envolvendo contratos.
+ */
 public class ContractView {
 
     private final ContractDAO contractDAO;
@@ -27,17 +41,49 @@ public class ContractView {
     private final ContractTemplateDAO templateDAO;
     private final IndexDAO indexDAO;
     private final TopicDAO topicDAO;
+    
+    private final UserView userView;
+    private final PropertyView propertyView;
+    private final InstallmentDAO installmentDAO;
+    private final BankAccountDAO bankAccountDAO;
+    private final UserContractDAO userContractDAO;
+    private final AddressDAO addressDAO;
+    private final DistrictDAO districtDAO;
+    private final CityDAO cityDAO;
+    private final VariableDAO variableDAO;
+    private final ClauseDAO clauseDAO;
+    private final dao.NotaryDAO notaryDAO;
+    private final OccupationDAO occupationDAO;
 
     public ContractView(ContractDAO contractDAO, PropertyDAO propertyDAO, UserDAO userDAO,
-                        ContractTemplateDAO templateDAO, IndexDAO indexDAO, TopicDAO topicDAO) {
+                        ContractTemplateDAO templateDAO, IndexDAO indexDAO, TopicDAO topicDAO,
+                        UserView userView, PropertyView propertyView, InstallmentDAO installmentDAO,
+                        BankAccountDAO bankAccountDAO, UserContractDAO userContractDAO,
+                        AddressDAO addressDAO, DistrictDAO districtDAO, CityDAO cityDAO,
+                        VariableDAO variableDAO, ClauseDAO clauseDAO, dao.NotaryDAO notaryDAO, OccupationDAO occupationDAO) {
         this.contractDAO = contractDAO;
         this.propertyDAO = propertyDAO;
         this.userDAO = userDAO;
         this.templateDAO = templateDAO;
         this.indexDAO = indexDAO;
         this.topicDAO = topicDAO;
+        this.userView = userView;
+        this.propertyView = propertyView;
+        this.installmentDAO = installmentDAO;
+        this.bankAccountDAO = bankAccountDAO;
+        this.userContractDAO = userContractDAO;
+        this.addressDAO = addressDAO;
+        this.districtDAO = districtDAO;
+        this.cityDAO = cityDAO;
+        this.variableDAO = variableDAO;
+        this.clauseDAO = clauseDAO;
+        this.notaryDAO = notaryDAO;
+        this.occupationDAO = occupationDAO;
     }
 
+    /**
+     * Menu principal de processos de negócio.
+     */
     public void menu() {
         System.out.println("\n--- PROCESSOS DE NEGÓCIO ---");
         System.out.println("1. EFETIVAR NOVO CONTRATO");
@@ -46,248 +92,330 @@ public class ContractView {
         System.out.println("4. ALTERAR CONTRATO");
         System.out.println("5. EXCLUIR CONTRATO");
         System.out.println("6. ESTRUTURAR MODELO DE CONTRATO (VINCULAR TÓPICOS)");
+        System.out.println("7. PROCESSAR REAJUSTES MENSAIS (JOB MANUAL)");
+        System.out.println("8. PROCESSAR NOTIFICAÇÕES (JOB MANUAL)");
+        System.out.println("9. REGISTRAR PAGAMENTO DE PARCELA");
         switch (lerIntSeguro("Escolha: ")) {
-            case 1: realizar(); break;
+            case 1: realizarNovoFluxo(); break;
             case 2: vincularDono(); break;
             case 3: desvincularDono(); break;
             case 4: alterar(); break;
             case 5: excluir(); break;
             case 6: estruturarModelo(); break;
+            case 7: dispararJobReajuste(); break;
+            case 8: dispararJobNotificacoes(); break;
+            case 9: registrarPagamento(); break;
         }
     }
+    
+    private void registrarPagamento() {
+        System.out.println("\n--- REGISTRAR PAGAMENTO DE PARCELA ---");
 
-    private void realizar() {
-        System.out.println("\n--- NOVO CONTRATO ---");
+        int idContrato = lerIdValido("ID do Contrato",
+            contractDAO::findById,
+            () -> contractDAO.getActiveContractsList("geral").forEach(System.out::println));
+        if (idContrato <= 0) { System.out.println("Operação cancelada."); return; }
 
-        int idP = lerIdValido("ID Imóvel (apenas disponíveis)",
-                id -> {
-                    Properties p = propertyDAO.findById(id);
-                    return (p != null && p.getCdstatus() == 2) ? p : null;
-                },
-                () -> propertyDAO.getAvailableOnly().forEach(System.out::println));
-        if (idP == -1) return;
-
-        List<Integer> donos = propertyDAO.getOwnerIdsByProperty(idP);
-        if (donos.isEmpty()) {
-            System.out.println("ERRO: Este imóvel não possui nenhum proprietário vinculado.");
-            System.out.println("Use a opção '2. VINCULAR PROPRIETÁRIO A IMÓVEL' antes de efetivar um contrato.");
+        List<Installments> pendentes = installmentDAO.findPendingInstallmentsByContractId(idContrato);
+        if (pendentes.isEmpty()) {
+            System.out.println("Nenhuma parcela pendente encontrada para o contrato #" + idContrato);
             return;
         }
 
-        int idU = lerIdValido("ID Cliente (Locatário/Comprador)",
-                userDAO::findById,
-                () -> userDAO.getAllUsersList().forEach(System.out::println));
-        if (idU == -1) return;
+        System.out.println("\n--- PARCELAS PENDENTES (Contrato #" + idContrato + ") ---");
+        System.out.printf("%-12s | %-8s | %-12s | %-14s | %-12s%n",
+            "ID Parcela", "Nº", "Vencimento", "Valor", "Status");
+        System.out.println("-----------------------------------------------------------------------");
+        for (Installments inst : pendentes) {
+            double valor = inst.getVladjusted() > 0 ? inst.getVladjusted() : inst.getVlbase();
+            System.out.printf("ID: %d | Nº: %d | Vencimento: %s | Valor: R$ %.2f%n",
+                inst.getCdinstallment(), inst.getNrinstallment(),
+                inst.getDtdue().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")),
+                valor);
+        }
 
-        // --- VALIDAÇÃO DE REGRA DE NEGÓCIO: PROPRIETÁRIO VS LOCATÁRIO ---
-        if (donos.contains(idU)) {
-            if (donos.size() == 1) {
-                System.out.println("ERRO: O cliente selecionado é o ÚNICO proprietário deste imóvel.");
-                System.out.println("Não é possível celebrar um contrato consigo mesmo.");
-                return;
-            } else {
-                if (!confirmar("AVISO: O cliente selecionado também é um dos proprietários deste imóvel. Deseja prosseguir? (s/n): ")) {
-                    System.out.println("Operação cancelada.");
-                    return;
+        int idParcela = lerIntSeguro("ID da Parcela a pagar (0 para cancelar): ");
+        if (idParcela <= 0) { System.out.println("Operação cancelada."); return; }
+
+        Installments alvo = null;
+        for (Installments inst : pendentes) {
+            if (inst.getCdinstallment() == idParcela) {
+                alvo = inst;
+                break;
+            }
+        }
+        if (alvo == null) {
+            System.out.println("Parcela inválida.");
+            return;
+        }
+
+        boolean emAtraso = alvo.getDtdue().isBefore(LocalDate.now());
+        if (emAtraso) {
+            service.FinancialService financialService = new service.FinancialService();
+            alvo = financialService.calculateLateFeesAndInterest(alvo);
+        }
+
+        // Confirma o pagamento (exibe o valor ATUALIZADO com juros/multa se houver)
+        double valorFinal = alvo.getVladjusted() > 0 ? alvo.getVladjusted() : alvo.getVlbase();
+        if (emAtraso) {
+            long diasAtraso = java.time.temporal.ChronoUnit.DAYS.between(alvo.getDtdue(), LocalDate.now());
+            System.out.printf("%n⚠  PARCELA EM ATRASO há %d dia(s)!%n", diasAtraso);
+            System.out.printf("   Valor Original: R$ %.2f%n", alvo.getVlbase());
+            System.out.printf("   Multa (%.0f%%):  R$ %.2f%n", alvo.getVlpenalty() * 100, alvo.getVlbase() * alvo.getVlpenalty());
+            System.out.printf("   Juros Diários:  R$ %.2f%n", alvo.getVlbase() * alvo.getVlinterest() * diasAtraso);
+            System.out.printf("   TOTAL A PAGAR:  R$ %.2f%n", valorFinal);
+        } else {
+            System.out.printf("%nConfirmar pagamento da Parcela #%d (R$ %.2f) vencida em %s?%n",
+                alvo.getNrinstallment(), valorFinal,
+                alvo.getDtdue().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+        }
+        if (!confirmar("Confirmar pagamento? (s/n): ")) { System.out.println("Pagamento cancelado."); return; }
+
+        // Registra o pagamento com o valor atualizado
+        alvo.setCdstatus(model.InstallmentStatus.PAGO.getCode());
+        alvo.setDtpayment(LocalDate.now());
+        installmentDAO.update(alvo);
+
+        System.out.printf("%nPagamento da Parcela #%d registrado com sucesso! Valor cobrado: R$ %.2f (Data: %s)%n",
+            alvo.getNrinstallment(), valorFinal,
+            LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+    }
+
+    private void dispararJobNotificacoes() {
+        System.out.println("\n--- PROCESSAR NOTIFICAÇÕES (JOB MANUAL) ---");
+        System.out.println("1. Lembretes de Vencimento de Aluguel (Inquilino)");
+        System.out.println("2. Confirmação de Pagamento (Locador)");
+        System.out.println("3. Avisos de Reajuste Anual (Locador + Inquilino)");
+        System.out.println("4. Avisos de Vencimento de Contrato (Locador + Inquilino)");
+        System.out.println("5. Processar TODOS os Jobs");
+
+        service.NotificationService notificationService = new service.NotificationService();
+        System.out.println("\n--- 1. Lembretes 2. Confirmação Pagto 3. Reajuste 4. Vencimento Contrato 5. TODOS ---");
+        switch (lerIntSeguro("Escolha: ")) {
+            case 1: notificationService.processarLembretesDeAluguel(); break;
+            case 2: notificationService.processarConfirmacaoDePagamento(); break;
+            case 3: notificationService.processarAvisosDeReajuste(); break;
+            case 4: notificationService.processarAvisosDeVencimentoContrato(); break;
+            case 5: notificationService.processarTodosOsJobs(); break;
+            default: System.out.println("Opção inválida.");
+        }
+    }
+
+    private void dispararJobReajuste() {
+        System.out.println("\n--- PROCESSAR REAJUSTES MENSAIS ---");
+        System.out.println("Iniciando rotina de verificação e reajuste de contratos ativos...");
+        service.AutomationService automationService = new service.AutomationService();
+        automationService.processMonthlyAdjustments();
+        
+        List<Contracts> expiringContracts = automationService.getExpiringContracts();
+        if (!expiringContracts.isEmpty()) {
+            System.out.println("\nATENÇÃO: " + expiringContracts.size() + " contrato(s) com data limite prevista para este mês.");
+            for (Contracts c : expiringContracts) {
+                System.out.println("\n-> Contrato ID: " + c.getCdcontract() + " | Título: " + c.getDstitle() + " | Vence em: " + c.getDtlimit());
+                System.out.println("Selecione o destino para este contrato:");
+                System.out.println("1. Encerrar Contrato");
+                System.out.println("2. Renovar por Tempo Indeterminado");
+                System.out.println("3. Renovar por Tempo Determinado");
+                
+                int op = lerIntSeguro("Opção: ");
+                switch(op) {
+                    case 1:
+                        automationService.handleContractExpiration(c, ContractRenewalType.ENCERRAMENTO, 0);
+                        break;
+                    case 2:
+                        automationService.handleContractExpiration(c, ContractRenewalType.INDETERMINADO, 0);
+                        break;
+                    case 3:
+                        int meses = lerIntSeguro("Quantos meses de renovação? ");
+                        automationService.handleContractExpiration(c, ContractRenewalType.DETERMINADO, meses);
+                        break;
+                    default:
+                        System.out.println("Opção inválida. Nenhuma ação tomada para este contrato.");
                 }
             }
         }
+        
+        System.out.println("\nRotina de reajuste mensal concluída!");
+    }
 
-        int idTpl = lerIdValido("ID do Modelo de Contrato (Template)",
+    private void realizarNovoFluxo() {
+        System.out.println("\n=== FLUXO DE CADASTRO DE CONTRATO ===");
+
+        int idTpl = lerIdValido("ID do Modelo",
                 templateDAO::findById,
                 () -> templateDAO.listAll().forEach(
-                        t -> System.out.println("ID: " + t.getCdtemplate() + " | Nome: " + t.getNmtemplate())));
+                        t -> System.out.println("ID: " + t.getCdtemplate() + " | " + t.getNmtemplate())));
         if (idTpl == -1) return;
 
-        int tipoNegocio;
-        while (true) {
-            tipoNegocio = lerIntSeguro("Tipo de Negócio (1=Locação/Parcelas Fixas, 2=Venda/Parcelas Personalizadas): ");
-            if (tipoNegocio == 1 || tipoNegocio == 2) break;
-            System.out.println("Opção inválida.");
+        Contracts contract = new Contracts();
+        contract.setCdtemplate(idTpl);
+        
+        String dtCreationStr = ler("Data de Criação (AAAA-MM-DD) ou [ENTER] para hoje: ");
+        contract.setDtcreation(dtCreationStr.isEmpty() ? LocalDate.now() : LocalDate.parse(dtCreationStr));
+        contract.setDstitle(ler("Título: "));
+
+        boolean isLocacao = confirmar("É locação? (s/n): ");
+        if (isLocacao) {
+            String dataStr = ler("Data limite (AAAA-MM-DD): ");
+            if (!dataStr.isEmpty()) contract.setDtlimit(LocalDate.parse(dataStr));
         }
 
-        int idIndex = lerIdValido("ID do Índice de Reajuste",
-                indexDAO::findById,
-                () -> indexDAO.listAll().forEach(
-                        i -> System.out.println("ID: " + i.getCdindex() + " | Nome: " + i.getNmindex())));
-        if (idIndex == -1) return;
+        int cdcontract = contractDAO.insertContract(contract);
+        if (cdcontract <= 0) return;
+        contract.setCdcontract(cdcontract);
 
-        Contracts c = new Contracts();
-        c.setDtcreation(LocalDate.now());
-        c.setDstitle(ler("Título do Contrato: "));
-        c.setCdtemplate(idTpl);
-        c.setCdproperty(idP);
-        c.setCdindex(idIndex);
-
-        List<Installments> parcelas = coletarParcelas(tipoNegocio);
-        List<User_Contract> partes = montarPartes(idP, idU, tipoNegocio);
-
-        int novoStatus = (tipoNegocio == 1) ? 1 : 3; // 1=Alugado, 2=Disponível, 3=Vendido
-        contractDAO.processFullContract(c, partes, parcelas, null, novoStatus);
-    }
-
-    private List<Installments> coletarParcelas(int tipoNegocio) {
-        int qtd = lerInt("Quantidade de Parcelas: ");
-        List<Installments> parcelas = new ArrayList<>();
-        if (tipoNegocio == 1) {
-            double v = lerDouble("Valor de cada parcela: ");
-            for (int i = 1; i <= qtd; i++) parcelas.add(criarParcela(i, v));
-        } else {
-            System.out.println("Modo Venda/Personalizado. Preencha o valor de cada parcela:");
-            for (int i = 1; i <= qtd; i++) {
-                double v = lerDouble("Valor da Parcela " + i + ": ");
-                parcelas.add(criarParcela(i, v));
+        List<Integer> idsPartesContrato = new ArrayList<>();
+        
+        System.out.println("\n--- VINCULAR LOCADORES ---");
+        do {
+            int idUser = selecionarOuCriarUsuario(idsPartesContrato);
+            if (idUser > 0) {
+                idsPartesContrato.add(idUser);
+                vincularParte(cdcontract, idUser, 2); // Locador
             }
+        } while (confirmar("Outro Locador? (s/n): "));
+
+        System.out.println("\n--- VINCULAR LOCATÁRIOS ---");
+        do {
+            int idUser = selecionarOuCriarUsuario(idsPartesContrato);
+            if (idUser > 0) {
+                idsPartesContrato.add(idUser);
+                vincularParte(cdcontract, idUser, 1); // Locatário
+            }
+        } while (confirmar("Outro Locatário? (s/n): "));
+
+        if (confirmar("Adicionar representante? (s/n): ")) {
+            int idUser = selecionarOuCriarUsuario(idsPartesContrato);
+            if (idUser > 0) vincularParte(cdcontract, idUser, 4);
         }
-        return parcelas;
+
+        System.out.println("\n--- VINCULAR TESTEMUNHAS ---");
+        for (int i = 1; i <= 2; i++) {
+            int idUser = selecionarOuCriarUsuario(idsPartesContrato);
+            if (idUser > 0) {
+                idsPartesContrato.add(idUser);
+                vincularParte(cdcontract, idUser, 3);
+            } else i--;
+        }
+
+        int cdproperty = lerIdValido("Selecionar Imóvel",
+                propertyDAO::findById,
+                () -> propertyDAO.getAvailableProperties().forEach(System.out::println),
+                propertyView::cadastrar);
+
+        if (cdproperty > 0) {
+            contract.setCdproperty(cdproperty);
+            contractDAO.updateContract(contract);
+        }
+
+        System.out.println("\n--- DADOS DO TABELIONATO ---");
+        model.Notaries n = new model.Notaries();
+        n.setCdcity(lerIdValido("Cidade do Tabelionato", cityDAO::findById, () -> cityDAO.listAll().forEach(System.out::println)));
+        n.setNrnotary(lerIntSeguro("Número: "));
+        n.setBook(ler("Livro: "));
+        n.setLeaf(ler("Folha: "));
+        n.setDt(LocalDate.now());
+        contract.setCdnotary(notaryDAO.insertNotary(n));
+        contractDAO.updateContract(contract);
+
+        if (isLocacao) {
+            gerarParcelasAutomaticas(contract);
+        }
+
+        int idIndex = lerIdValido("ID do Índice", indexDAO::findById, () -> indexDAO.listAll().forEach(System.out::println));
+        if (idIndex > 0) {
+            contract.setCdindex(idIndex);
+            contractDAO.updateContract(contract);
+        }
+
+        service.ContractPdfService pdfService = new service.ContractPdfService(
+            templateDAO, topicDAO, clauseDAO, contractDAO, propertyDAO, userDAO, userContractDAO,
+            addressDAO, districtDAO, cityDAO, installmentDAO, bankAccountDAO, variableDAO, indexDAO, notaryDAO, occupationDAO
+        );
+        pdfService.generateContractPdf(cdcontract);
     }
 
-    private List<User_Contract> montarPartes(int idP, int idU, int tipoNegocio) {
-        List<User_Contract> partes = new ArrayList<>();
-        for (int idDono : propertyDAO.getOwnerIdsByProperty(idP)) {
-            User_Contract ud = new User_Contract();
-            ud.setCduser(idDono);
-            ud.setCdrole(1); // Proprietário
-            ud.setFgsignaturestatus(SignatureStatus.PENDENTE.getCode());
-            partes.add(ud);
-        }
+    private void vincularParte(int cdcontract, int cduser, int cdrole) {
         User_Contract uc = new User_Contract();
-        uc.setCduser(idU);
-        uc.setCdrole(tipoNegocio == 1 ? 2 : 4); // 2=Locatário, 4=Comprador
-        uc.setVlparticipation(100.0);
+        uc.setCdcontract(cdcontract);
+        uc.setCduser(cduser);
+        uc.setCdrole(cdrole);
         uc.setFgsignaturestatus(SignatureStatus.PENDENTE.getCode());
-        partes.add(uc);
-        return partes;
+        uc.setVlparticipation(100.0);
+        userContractDAO.insert(uc);
     }
 
-    private static Installments criarParcela(int num, double valor) {
-        Installments inst = new Installments();
-        inst.setNrinstallment(num);
-        inst.setVlbase(valor);
-        inst.setDtdue(LocalDate.now().plusMonths(num));
-        inst.setCdstatus(1);
-        return inst;
+    private void gerarParcelasAutomaticas(Contracts contract) {
+        int qtdMeses = (int) java.time.temporal.ChronoUnit.MONTHS.between(contract.getDtcreation(), contract.getDtlimit());
+        if (qtdMeses <= 0) qtdMeses = 1;
+
+        double valorMensal = lerDouble("Valor aluguel: ");
+        double multa = lerDouble("Multa atraso: ");
+        double juros = lerDouble("Juros atraso: ");
+        LocalDate dataVencimento = LocalDate.now().plusMonths(1);
+
+        List<Installments> parcelas = new ArrayList<>();
+        for (int i = 1; i <= qtdMeses; i++) {
+            Installments inst = new Installments();
+            inst.setNrinstallment(i);
+            inst.setDtdue(dataVencimento.plusMonths(i - 1));
+            inst.setVlbase(valorMensal);
+            inst.setCdstatus(1);
+            inst.setFk_Contracts_cdcontract(contract.getCdcontract());
+            inst.setVlpenalty(multa);
+            inst.setVlinterest(juros);
+            parcelas.add(inst);
+        }
+        installmentDAO.insertBatch(parcelas);
+    }
+
+    private int selecionarOuCriarUsuario(List<Integer> idsIgnorar) {
+        return lerIdValido("Selecionar Usuário",
+                id -> idsIgnorar.contains(id) ? null : userDAO.findById(id),
+                () -> userDAO.getAllUsersList().forEach(System.out::println),
+                () -> userView.cadastrar());
     }
 
     private void vincularDono() {
-        System.out.println("\n--- VINCULAR PROPRIETÁRIO A IMÓVEL ---");
-        int idP = lerIdValido("ID Imóvel",
-                propertyDAO::findById,
-                () -> propertyDAO.getAvailableProperties().forEach(System.out::println));
-        if (idP == -1) return;
-
-        int idU = lerIdValido("ID Usuário Proprietário",
-                userDAO::findById,
-                () -> userDAO.getAllUsersList().forEach(System.out::println));
-        if (idU == -1) return;
-
-        if (propertyDAO.hasAlreadyThisOwner(idP, idU)) {
-            System.out.println("\nAVISO: Este usuário já está vinculado como proprietário deste imóvel.");
-            return;
+        int idP = lerIdValido("ID Imóvel", propertyDAO::findById, () -> propertyDAO.getAvailableProperties().forEach(System.out::println));
+        int idU = lerIdValido("ID Usuário", userDAO::findById, () -> userDAO.getAllUsersList().forEach(System.out::println));
+        if (idP > 0 && idU > 0 && !propertyDAO.hasAlreadyThisOwner(idP, idU)) {
+            propertyDAO.linkOwner(idP, idU);
         }
-        propertyDAO.linkOwner(idP, idU);
     }
 
     private void desvincularDono() {
-        System.out.println("\n--- DESVINCULAR PROPRIETÁRIO DE IMÓVEL ---");
-        int idP = lerIdValido("ID Imóvel",
-                propertyDAO::findById,
-                () -> {
-                    List<String> imoveis = propertyDAO.getPropertiesWithOwners();
-                    if (imoveis.isEmpty()) System.out.println("AVISO: Nenhum imóvel possui proprietários vinculados.");
-                    else imoveis.forEach(System.out::println);
-                });
-        if (idP == -1) return;
-
-        final int finalIdP = idP;
-        int idU = lerIdValido("ID Usuário Proprietário",
-                id -> propertyDAO.hasAlreadyThisOwner(finalIdP, id) ? Integer.valueOf(id) : null,
-                () -> {
-                    List<String> donos = propertyDAO.getOwnersByProperty(finalIdP);
-                    if (donos.isEmpty()) System.out.println("AVISO: Nenhum proprietário vinculado.");
-                    else donos.forEach(System.out::println);
-                });
-        if (idU == -1) return;
-
-        if (confirmar("Confirmar desvinculação? (s/n): ")) {
+        int idP = lerIdValido("ID Imóvel", propertyDAO::findById, () -> propertyDAO.getPropertiesWithOwners().forEach(System.out::println));
+        if (idP <= 0) return;
+        int idU = lerIdValido("ID Usuário", id -> propertyDAO.hasAlreadyThisOwner(idP, id) ? id : null, () -> propertyDAO.getOwnersByProperty(idP).forEach(System.out::println));
+        if (idU > 0 && confirmar("Desvincular? (s/n): ")) {
             propertyDAO.unlinkOwner(idP, idU);
-        } else {
-            System.out.println("Operação cancelada.");
         }
     }
 
     private void alterar() {
-        System.out.println("\n--- ALTERAR CONTRATO ---");
-        int idC = lerIdValido("ID Contrato",
-                contractDAO::findById,
-                () -> contractDAO.getActiveContractsList().forEach(System.out::println));
-        if (idC == -1) return;
-
+        int idC = lerIdValido("ID Contrato", contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println));
+        if (idC <= 0) return;
         Contracts c = contractDAO.findById(idC);
-        System.out.println("Pressione ENTER para manter o valor atual.");
         c.setDstitle(lerOuManter("Título", c.getDstitle()));
-        
-        while (true) {
-            String data = ler("Data Criação (" + c.getDtcreation() + "): ");
-            if (data.isEmpty()) break;
-            try {
-                c.setDtcreation(LocalDate.parse(data.replace("/", "-")));
-                break;
-            } catch (Exception e) { System.out.println("ERRO: Data inválida! Use AAAA-MM-DD."); }
-        }
-        
-        c.setCdtemplate(lerIdOuManter("ID Modelo", c.getCdtemplate(),
-                templateDAO::findById,
-                () -> templateDAO.listAll().forEach(
-                        t -> System.out.println("ID: " + t.getCdtemplate() + " | Nome: " + t.getNmtemplate()))));
-        c.setCdindex(lerIdOuManter("ID Índice de Reajuste", c.getCdindex(),
-                indexDAO::findById,
-                () -> indexDAO.listAll().forEach(
-                        i -> System.out.println("ID: " + i.getCdindex() + " | Nome: " + i.getNmindex()))));
         contractDAO.updateContract(c);
     }
 
     private void excluir() {
-        System.out.println("\n--- EXCLUIR CONTRATO ---");
-        int idC = lerIdValido("ID Contrato",
-                contractDAO::findById,
-                () -> contractDAO.getActiveContractsList().forEach(System.out::println));
-        if (idC == -1) return;
-
-        Contracts c = contractDAO.findById(idC);
-        System.out.println("ATENÇÃO: Excluir o contrato apagará TODAS as parcelas, notificações e comissões vinculadas.");
-        if (!confirmar("Confirmar exclusão do contrato '" + c.getDstitle() + "'? (s/n): ")) {
-            System.out.println("Operação cancelada.");
-            return;
-        }
-        if (contractDAO.deleteContract(idC)) {
-            System.out.println("Contrato excluído com sucesso!");
-            if (confirmar("Voltar status do Imóvel ID " + c.getCdproperty() + " para 'Disponível' (2)? (s/n): ")) {
-                Properties p = propertyDAO.findById(c.getCdproperty());
-                if (p != null) { p.setCdstatus(2); propertyDAO.updateProperty(p); }
-            }
+        int idC = lerIdValido("ID Contrato", contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println));
+        if (idC <= 0) return;
+        if (confirmar("Excluir contrato e todos os vínculos? (s/n): ")) {
+            contractDAO.deleteContract(idC);
         }
     }
 
     private void estruturarModelo() {
-        System.out.println("\n--- ESTRUTURAR MODELO DE CONTRATO ---");
-        int idTpl = lerIdValido("ID do Modelo de Contrato",
-                templateDAO::findById,
-                () -> templateDAO.listAll().forEach(
-                        t -> System.out.println("ID: " + t.getCdtemplate() + " | Nome: " + t.getNmtemplate())));
-        if (idTpl == -1) return;
-
-        System.out.println("\n--- Tópicos disponíveis ---");
-        topicDAO.listAll().forEach(t -> System.out.println("ID: " + t.getCdtopic() + " | " + t.getNmtopic()));
-
+        int idTpl = lerIdValido("ID Modelo", templateDAO::findById, () -> templateDAO.listAll().forEach(t -> System.out.println(t.getCdtemplate() + " - " + t.getNmtemplate())));
+        if (idTpl <= 0) return;
         while (true) {
-            int idTopic = lerIntSeguro("\nID do Tópico para vincular (0 para concluir o processo): ");
+            int idTopic = lerIntSeguro("ID Tópico para vincular (0 para concluir): ");
             if (idTopic <= 0) break;
-            if (topicDAO.findById(idTopic) == null) {
-                System.out.println("Tópico inválido.");
-            } else {
-                templateDAO.linkTopic(idTpl, idTopic);
-            }
+            templateDAO.linkTopic(idTpl, idTopic);
         }
     }
 }
