@@ -317,16 +317,6 @@ COPY public.contracts (cdcontract, dtcreation, dstitle, cdtemplate, cdproperty, 
 
 
 --
--- TOC entry 5143 (class 0 OID 26138)
--- Dependencies: 248
--- Data for Name: commissions; Type: TABLE DATA; Schema: public; Owner: -
---
-
-COPY public.commissions (cdcommission, vlcommission, dtpayment, cdcontract) FROM stdin;
-\.
-
-
---
 -- TOC entry 5158 (class 0 OID 26194)
 -- Dependencies: 263
 -- Data for Name: index_rates; Type: TABLE DATA; Schema: public; Owner: -
@@ -588,16 +578,6 @@ SELECT pg_catalog.setval('public.cities_cdcity_seq', 1, true);
 --
 
 SELECT pg_catalog.setval('public.clauses_cdclause_seq', 49, true);
-
-
---
--- TOC entry 5179 (class 0 OID 0)
--- Dependencies: 247
--- Name: commissions_cdcommission_seq; Type: SEQUENCE SET; Schema: public; Owner: -
---
-
-SELECT pg_catalog.setval('public.commissions_cdcommission_seq', 1, true);
-
 
 --
 -- TOC entry 5180 (class 0 OID 0)

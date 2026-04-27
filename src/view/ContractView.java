@@ -9,17 +9,13 @@ import dao.CityDAO;
 import dao.ClauseDAO;
 import dao.DistrictDAO;
 import dao.InstallmentDAO;
-import dao.NotaryDAO;
 import dao.OccupationDAO;
 import dao.PropertyDAO;
 import dao.TopicDAO;
 import dao.UserContractDAO;
 import dao.UserDAO;
-import dao.VariableDAO;
-import model.Bank_Accounts;
 import model.Contracts;
 import model.Installments;
-import model.Properties;
 import model.SignatureStatus;
 import model.User_Contract;
 import model.ContractRenewalType;
@@ -50,7 +46,6 @@ public class ContractView {
     private final AddressDAO addressDAO;
     private final DistrictDAO districtDAO;
     private final CityDAO cityDAO;
-    private final VariableDAO variableDAO;
     private final ClauseDAO clauseDAO;
     private final dao.NotaryDAO notaryDAO;
     private final OccupationDAO occupationDAO;
@@ -60,7 +55,7 @@ public class ContractView {
                         UserView userView, PropertyView propertyView, InstallmentDAO installmentDAO,
                         BankAccountDAO bankAccountDAO, UserContractDAO userContractDAO,
                         AddressDAO addressDAO, DistrictDAO districtDAO, CityDAO cityDAO,
-                        VariableDAO variableDAO, ClauseDAO clauseDAO, dao.NotaryDAO notaryDAO, OccupationDAO occupationDAO) {
+                        ClauseDAO clauseDAO, dao.NotaryDAO notaryDAO, OccupationDAO occupationDAO) {
         this.contractDAO = contractDAO;
         this.propertyDAO = propertyDAO;
         this.userDAO = userDAO;
@@ -75,7 +70,6 @@ public class ContractView {
         this.addressDAO = addressDAO;
         this.districtDAO = districtDAO;
         this.cityDAO = cityDAO;
-        this.variableDAO = variableDAO;
         this.clauseDAO = clauseDAO;
         this.notaryDAO = notaryDAO;
         this.occupationDAO = occupationDAO;
@@ -330,7 +324,7 @@ public class ContractView {
 
         service.ContractPdfService pdfService = new service.ContractPdfService(
             templateDAO, topicDAO, clauseDAO, contractDAO, propertyDAO, userDAO, userContractDAO,
-            addressDAO, districtDAO, cityDAO, installmentDAO, bankAccountDAO, variableDAO, indexDAO, notaryDAO, occupationDAO
+            addressDAO, districtDAO, cityDAO, installmentDAO, bankAccountDAO, indexDAO, notaryDAO, occupationDAO
         );
         pdfService.generateContractPdf(cdcontract);
     }
@@ -370,10 +364,29 @@ public class ContractView {
     }
 
     private int selecionarOuCriarUsuario(List<Integer> idsIgnorar) {
-        return lerIdValido("Selecionar Usuário",
-                id -> idsIgnorar.contains(id) ? null : userDAO.findById(id),
-                () -> userDAO.getAllUsersList().forEach(System.out::println),
-                () -> userView.cadastrar());
+        while (true) {
+            int id = lerIdValido("Selecionar Usuário",
+                    userDAO::findById,
+                    () -> userDAO.getAllUsersList().stream()
+                            .filter(linha -> idsPartesNaoContemLinha(linha, idsIgnorar))
+                            .forEach(System.out::println),
+                    () -> userView.cadastrar());
+            if (id <= 0) return id;
+            if (idsIgnorar.contains(id)) {
+                System.out.println("ERRO: este usuário já foi vinculado a uma parte deste contrato. Escolha outro.");
+                continue;
+            }
+            return id;
+        }
+    }
+
+    private boolean idsPartesNaoContemLinha(String linha, List<Integer> idsIgnorar) {
+        try {
+            int idLinha = Integer.parseInt(linha.replaceAll(".*ID:\\s*(\\d+).*", "$1"));
+            return !idsIgnorar.contains(idLinha);
+        } catch (Exception e) {
+            return true;
+        }
     }
 
     private void vincularDono() {

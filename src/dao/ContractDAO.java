@@ -17,10 +17,9 @@ public class ContractDAO {
      * @param contract Objeto contendo os dados do contrato.
      * @param participants Lista de participantes e seus papéis.
      * @param installments Lista de parcelas financeiras.
-     * @param commission Objeto contendo os dados da comissão, se houver.
      * @param novoStatus Novo código de status para o imóvel.
      */
-    public void processFullContract(Contracts contract, List<User_Contract> participants, List<Installments> installments, Commissions commission, int novoStatus) {
+    public void processFullContract(Contracts contract, List<User_Contract> participants, List<Installments> installments, int novoStatus) {
         Connection conn = null;
         try {
             conn = Conexao.getConexao();
@@ -89,16 +88,6 @@ public class ContractDAO {
                     stmtS.setInt(1, novoStatus);
                     stmtS.setInt(2, contract.getCdproperty());
                     stmtS.executeUpdate();
-                }
-            }
-
-            if (commission != null) {
-                String sqlCom = "INSERT INTO Commissions (vlcommission, dtpayment, cdcontract) VALUES (?, ?, ?)";
-                try (PreparedStatement stmtCom = conn.prepareStatement(sqlCom)) {
-                    stmtCom.setDouble(1, commission.getVlcommission());
-                    stmtCom.setDate(2, commission.getDtpayment() != null ? Date.valueOf(commission.getDtpayment()) : null);
-                    stmtCom.setInt(3, generatedContractId);
-                    stmtCom.executeUpdate();
                 }
             }
 
@@ -425,9 +414,7 @@ public class ContractDAO {
             conn.setAutoCommit(false);
             conn.createStatement().executeUpdate("DELETE FROM Installments WHERE cdcontract = " + id);
             conn.createStatement().executeUpdate("DELETE FROM User_Contract WHERE cdcontract = " + id);
-            conn.createStatement().executeUpdate("DELETE FROM Commissions WHERE cdcontract = " + id);
             conn.createStatement().executeUpdate("DELETE FROM Notifications WHERE cdcontract = " + id);
-            conn.createStatement().executeUpdate("DELETE FROM Variables WHERE cdcontract = " + id);
             
             PreparedStatement ps = conn.prepareStatement("DELETE FROM Contracts WHERE cdcontract = ?");
             ps.setInt(1, id);

@@ -8,8 +8,6 @@ import dao.ContractTemplateDAO;
 import dao.CountryDAO;
 import dao.ContractDAO;
 import dao.TopicDAO;
-import dao.VariableDAO;
-import dao.CommissionDAO;
 import dao.BrokerDataDAO;
 import dao.DistrictDAO;
 import dao.IndexDAO;
@@ -38,8 +36,6 @@ import model.Property_Status;
 import model.Property_Types;
 import model.Roles;
 import model.Topics;
-import model.Variables;
-import model.Commissions;
 import model.Broker_Data;
 import model.States;
 import model.Addresses;
@@ -67,8 +63,6 @@ public class DomainCrudView {
     private final BankAccountDAO bankAccountDAO;
     private final NotificationDAO notificationDAO;
     private final TopicDAO topicDAO;
-    private final VariableDAO variableDAO;
-    private final CommissionDAO commissionDAO;
     private final BrokerDataDAO brokerDataDAO;
     private final StateDAO stateDAO;
     private final AddressDAO addressDAO;
@@ -85,8 +79,7 @@ public class DomainCrudView {
                           PropertyStatusDAO propertyStatusDAO, ContractTemplateDAO templateDAO,
                           ClauseDAO clauseDAO, IndexDAO indexDAO, RoleDAO roleDAO,
                           BankAccountDAO bankAccountDAO, NotificationDAO notificationDAO,
-                          TopicDAO topicDAO, VariableDAO variableDAO, 
-                          CommissionDAO commissionDAO, BrokerDataDAO brokerDataDAO, StateDAO stateDAO, 
+                          TopicDAO topicDAO, BrokerDataDAO brokerDataDAO, StateDAO stateDAO, 
                           AddressDAO addressDAO, IndexRateDAO indexRateDAO, UserDAO userDAO, ContractDAO contractDAO,
                           InstallmentDAO installmentDAO, UserContractDAO userContractDAO, NotaryDAO notaryDAO, OccupationDAO occupationDAO) {
         this.countryDAO = countryDAO;
@@ -102,8 +95,6 @@ public class DomainCrudView {
         this.bankAccountDAO = bankAccountDAO;
         this.notificationDAO = notificationDAO;
         this.topicDAO = topicDAO;
-        this.variableDAO = variableDAO;
-        this.commissionDAO = commissionDAO;
         this.brokerDataDAO = brokerDataDAO;
         this.stateDAO = stateDAO;
         this.addressDAO = addressDAO;
@@ -150,7 +141,7 @@ public class DomainCrudView {
     public void menuAtributosContratuais() {
         System.out.println("\n--- DOMÍNIOS CONTRATUAIS ---");
         System.out.println("1. Modelos (Templates)  2. Cláusulas  3. Índices  4. Taxas de Índice  5. Papéis");
-        System.out.println("6. Tópicos  7. Variáveis  8. Comissões  9. Corretores  10. Exportar Modelo para PDF  0. Voltar");
+        System.out.println("6. Tópicos  7. Corretores  8. Exportar Modelo para PDF  0. Voltar");
         switch (lerIntSeguro("Escolha: ")) {
             case 1: crudContractTemplate(); break;
             case 2: crudClause(); break;
@@ -158,10 +149,8 @@ public class DomainCrudView {
             case 4: crudIndexRate(); break;
             case 5: crudRole(); break;
             case 6: crudTopic(); break;
-            case 7: crudVariable(); break;
-            case 8: crudCommission(); break;
-            case 9: crudBrokerData(); break;
-            case 10: exportTemplatePdf(); break;
+            case 7: crudBrokerData(); break;
+            case 8: exportTemplatePdf(); break;
         }
     }
 
@@ -452,60 +441,10 @@ public class DomainCrudView {
         if (idTemplate > 0) {
             service.ContractPdfService pdfService = new service.ContractPdfService(
                 templateDAO, topicDAO, clauseDAO, contractDAO, new dao.PropertyDAO(), userDAO, userContractDAO,
-                addressDAO, districtDAO, cityDAO, installmentDAO, bankAccountDAO, variableDAO, indexDAO, notaryDAO, occupationDAO
+                addressDAO, districtDAO, cityDAO, installmentDAO, bankAccountDAO, indexDAO, notaryDAO, occupationDAO
             );
             pdfService.generateTemplatePdf(idTemplate);
         }
-    }
-
-    private void crudVariable() {
-        CrudConsole.run("Variáveis do Contrato",
-                () -> {
-                    Variables v = new Variables();
-                    v.setNmvariable(ler("Nome: "));
-                    v.setVlvariable(ler("Valor: "));
-                    v.setTpvariable(lerInt("Tipo (1=Texto, 2=Moeda, 3=Data): "));
-                    v.setFgtriggeralert(confirmar("Gera Alerta? (s/n): "));
-                    int idContrato = lerIdValido("ID Contrato", contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println));
-                    if (idContrato <= 0) return null;
-                    v.setCdcontract(idContrato);
-                    return v;
-                },
-                v -> {
-                    v.setNmvariable(lerOuManter("Nome", v.getNmvariable()));
-                    v.setVlvariable(lerOuManter("Valor", v.getVlvariable()));
-                    v.setTpvariable(lerIntOuManter("Tipo", v.getTpvariable()));
-                    v.setFgtriggeralert(confirmar("Gera Alerta? (s/n): "));
-                    v.setCdcontract(lerIdOuManter("ID Contrato", v.getCdcontract(), contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println)));
-                },
-                variableDAO::findById,
-                v -> v.getCdvariable() + " - " + v.getNmvariable() + ": " + v.getVlvariable(),
-                CrudConsole.adapt(variableDAO::insert, variableDAO::update, variableDAO::delete, variableDAO::listAll));
-    }
-
-    private void crudCommission() {
-        CrudConsole.run("Comissões",
-                () -> {
-                    Commissions c = new Commissions();
-                    c.setVlcommission(lerDouble("Valor: "));
-                    String d = ler("Data Pagamento (AAAA-MM-DD): ");
-                    if (!d.isEmpty()) c.setDtpayment(LocalDate.parse(d));
-                    int idContrato = lerIdValido("ID Contrato", contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println));
-                    if (idContrato <= 0) return null;
-                    c.setCdcontract(idContrato);
-                    return c;
-                },
-                c -> {
-                    try {
-                        c.setVlcommission(Double.parseDouble(lerOuManter("Valor", String.valueOf(c.getVlcommission()))));
-                    } catch (Exception e) {}
-                    String d = ler("Data Pagamento (" + c.getDtpayment() + "): ");
-                    if (!d.isEmpty()) c.setDtpayment(LocalDate.parse(d));
-                    c.setCdcontract(lerIdOuManter("ID Contrato", c.getCdcontract(), contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println)));
-                },
-                commissionDAO::findById,
-                c -> c.getCdcommission() + " - R$" + c.getVlcommission(),
-                CrudConsole.adapt(commissionDAO::insert, commissionDAO::update, commissionDAO::delete, commissionDAO::listAll));
     }
 
     private void crudBrokerData() {

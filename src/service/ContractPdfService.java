@@ -33,7 +33,6 @@ public class ContractPdfService {
     private final CityDAO cityDAO;
     private final InstallmentDAO installmentDAO;
     private final BankAccountDAO bankAccountDAO;
-    private final VariableDAO variableDAO;
     private final IndexDAO indexDAO;
     private final NotaryDAO notaryDAO;
     private final OccupationDAO occupationDAO;
@@ -42,7 +41,7 @@ public class ContractPdfService {
                                 ContractDAO contractDAO, PropertyDAO propertyDAO, UserDAO userDAO, 
                                 UserContractDAO userContractDAO, AddressDAO addressDAO, DistrictDAO districtDAO,
                                 CityDAO cityDAO, InstallmentDAO installmentDAO, BankAccountDAO bankAccountDAO,
-                                VariableDAO variableDAO, IndexDAO indexDAO, NotaryDAO notaryDAO, OccupationDAO occupationDAO) {
+                                IndexDAO indexDAO, NotaryDAO notaryDAO, OccupationDAO occupationDAO) {
         this.templateDAO = templateDAO;
         this.topicDAO = topicDAO;
         this.clauseDAO = clauseDAO;
@@ -55,7 +54,6 @@ public class ContractPdfService {
         this.cityDAO = cityDAO;
         this.installmentDAO = installmentDAO;
         this.bankAccountDAO = bankAccountDAO;
-        this.variableDAO = variableDAO;
         this.indexDAO = indexDAO;
         this.notaryDAO = notaryDAO;
         this.occupationDAO = occupationDAO;
@@ -277,11 +275,6 @@ public class ContractPdfService {
             vars.put("%juros_mensal%", String.format("%.2f%%", first.getVlinterest()));
         }
 
-        List<Variables> contractVars = variableDAO.findByContractId(contractId);
-        for (Variables v : contractVars) {
-            vars.put("%" + v.getNmvariable() + "%", v.getVlvariable());
-        }
-        
         vars.putIfAbsent("%valor_caucao%", vars.getOrDefault("%valor_aluguel%", "R$ 0,00"));
         vars.putIfAbsent("%cidade_tabelionato%", "Joinville");
         vars.putIfAbsent("%cidade tabelionato%", "Joinville");

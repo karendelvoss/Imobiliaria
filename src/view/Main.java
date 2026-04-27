@@ -38,8 +38,6 @@ public class Main {
         IndexDAO indexDAO = new IndexDAO();
         OccupationDAO occupationDAO = new OccupationDAO();
         TopicDAO topicDAO = new TopicDAO();
-        VariableDAO variableDAO = new VariableDAO();
-        CommissionDAO commissionDAO = new CommissionDAO();
         BrokerDataDAO brokerDataDAO = new BrokerDataDAO();
         StateDAO stateDAO = new StateDAO();
         AddressDAO addressDAO = new AddressDAO();
@@ -50,7 +48,7 @@ public class Main {
                 new PropertyTypeDAO(), new PropertyPurposeDAO(), new PropertyStatusDAO(),
                 templateDAO, new ClauseDAO(), indexDAO, new RoleDAO(),
                 new BankAccountDAO(), new NotificationDAO(),
-                topicDAO, variableDAO, commissionDAO, brokerDataDAO,
+                topicDAO, brokerDataDAO,
                 stateDAO, addressDAO, indexRateDAO, userDAO, contractDAO,
                 new InstallmentDAO(), new UserContractDAO(), new NotaryDAO(), occupationDAO);
 
@@ -61,7 +59,7 @@ public class Main {
         Main app = new Main(
                 uv,
                 pv,
-                new ContractView(contractDAO, propertyDAO, userDAO, templateDAO, indexDAO, topicDAO, uv, pv, installmentDAO, new BankAccountDAO(), new UserContractDAO(), addressDAO, new DistrictDAO(), new CityDAO(), variableDAO, new ClauseDAO(), new NotaryDAO(), occupationDAO),
+                new ContractView(contractDAO, propertyDAO, userDAO, templateDAO, indexDAO, topicDAO, uv, pv, installmentDAO, new BankAccountDAO(), new UserContractDAO(), addressDAO, new DistrictDAO(), new CityDAO(), new ClauseDAO(), new NotaryDAO(), occupationDAO),
                 domainView,
                 new ReportView(propertyDAO, new ReportService()),
                 new OccupationView(occupationDAO));
