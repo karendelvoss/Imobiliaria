@@ -32,7 +32,7 @@ public class ReadjustmentLogDAO {
             ps.executeUpdate();
             
         } catch (SQLException e) {
-            System.err.println("Error inserting readjustment log: " + e.getMessage());
+            System.err.println("Erro ao inserir log de reajuste: " + e.getMessage());
         }
     }
 }

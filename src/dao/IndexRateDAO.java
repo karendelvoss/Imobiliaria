@@ -31,7 +31,7 @@ public class IndexRateDAO {
 
             ps.executeUpdate();
         } catch (SQLException e) {
-            System.err.println("Error inserting index rate: " + e.getMessage());
+            System.err.println("Erro ao inserir taxa de índice: " + e.getMessage());
         }
     }
 

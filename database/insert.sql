@@ -519,6 +519,10 @@ COPY public.template_topics (cdtopic, cdtemplate) FROM stdin;
 --
 
 COPY public.user_contract (cdcontract, cduser, cdrole) FROM stdin;
+8	1	2
+8	2	1
+9	1	2
+9	2	1
 10	4	1
 10	3	2
 11	6	1

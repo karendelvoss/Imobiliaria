@@ -4,6 +4,7 @@ import dao.PropertyDAO;
 import service.ReportService;
 import static view.ConsoleIO.*;
 import dao.ContractDAO;
+import java.util.List;
 
 /**
  * Tela de acesso aos diversos relatórios do sistema.
@@ -48,11 +49,18 @@ public class ReportView {
             case 3:
                 int idPart = lerIdValido("ID do Contrato (Partes)", 
                     contractDAO::findById, 
-                    () -> contractDAO.getActiveContractsList("geral").forEach(System.out::println));
+                    () -> {
+                        List<String> comPartes = contractDAO.getContractsWithParticipantsList();
+                        if (comPartes.isEmpty()) {
+                            System.out.println("Nenhum contrato com partes vinculadas.");
+                        } else {
+                            comPartes.forEach(System.out::println);
+                        }
+                    });
                 if (idPart > 0) reportService.gerarRelatorioPartesContrato(idPart);
                 break;
             case 4:
-                System.out.println("\nBuscando reajustes previstos para o mês atual...");
+                System.out.println("\nBuscando reajustes previstos para o ano atual...");
                 reportService.gerarRelatorioReajustesDoMes();
                 break;
             case 5: {

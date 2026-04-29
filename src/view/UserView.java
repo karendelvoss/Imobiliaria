@@ -101,9 +101,18 @@ public class UserView {
 
     private void consultar() {
         while (true) {
-            String input = ler("\nID do Usuário para consulta detalhada: ");
+            String input = ler("\nID do Usuário para consulta detalhada: ").trim();
             if (input.isEmpty()) return;
-            Users u = userDAO.findById(Integer.parseInt(input));
+
+            int id;
+            try {
+                id = Integer.parseInt(input);
+            } catch (NumberFormatException e) {
+                System.out.println("Entrada inválida. Digite um número inteiro ou pressione ENTER para voltar.");
+                continue;
+            }
+
+            Users u = userDAO.findById(id);
             if (u != null) {
                 imprimir(u);
                 return;
@@ -130,9 +139,16 @@ public class UserView {
 
     private void atualizar() {
         while (true) {
-            String input = ler("\nID do usuário para atualizar: ");
+            String input = ler("\nID do usuário para atualizar: ").trim();
             if (input.isEmpty()) return;
-            Users u = userDAO.findById(Integer.parseInt(input));
+            int idUsuario;
+            try {
+                idUsuario = Integer.parseInt(input);
+            } catch (NumberFormatException e) {
+                System.out.println("Entrada inválida. Digite um número inteiro ou pressione ENTER para voltar.");
+                continue;
+            }
+            Users u = userDAO.findById(idUsuario);
             if (u == null) {
                 if (confirmar("ID não encontrado. Ver lista? (s/n): ")) {
                     userDAO.getAllUsersList().forEach(System.out::println);
@@ -189,9 +205,15 @@ public class UserView {
 
     private void excluir() {
         while (true) {
-            String input = ler("\nID do usuário para EXCLUIR: ");
+            String input = ler("\nID do usuário para EXCLUIR: ").trim();
             if (input.isEmpty()) return;
-            int id = Integer.parseInt(input);
+            int id;
+            try {
+                id = Integer.parseInt(input);
+            } catch (NumberFormatException e) {
+                System.out.println("Entrada inválida. Digite um número inteiro ou pressione ENTER para voltar.");
+                continue;
+            }
             Users u = userDAO.findById(id);
             if (u == null) {
                 System.out.println("ERRO: O ID " + id + " não existe no sistema.");

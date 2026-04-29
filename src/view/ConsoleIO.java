@@ -24,37 +24,77 @@ public final class ConsoleIO {
     }
 
     /**
-     * Lê um inteiro do console.
-     * 
+     * Lê um número inteiro do console. Em caso de entrada inválida exibe um
+     * aviso e re-pergunta até receber um inteiro válido.
+     *
      * @param label Texto de prompt.
      * @return Inteiro digitado.
      */
     public static int lerInt(String label) {
-        return Integer.parseInt(ler(label));
+        while (true) {
+            String s = ler(label).trim();
+            try {
+                return Integer.parseInt(s);
+            } catch (NumberFormatException e) {
+                System.out.println("Entrada inválida. Digite um número inteiro.");
+            }
+        }
     }
 
     /**
-     * Tenta ler um inteiro do console de forma segura.
-     * 
+     * Lê um número inteiro de forma segura, retornando -1 quando a entrada
+     * estiver vazia ou não for numérica (não fica em laço).
+     *
      * @param label Texto de prompt.
      * @return Inteiro digitado ou -1 em caso de erro.
      */
     public static int lerIntSeguro(String label) {
         try {
-            return lerInt(label);
-        } catch (Exception e) {
+            return Integer.parseInt(ler(label).trim());
+        } catch (NumberFormatException e) {
             return -1;
         }
     }
 
     /**
-     * Lê um double do console.
-     * 
+     * Lê um double do console, aceitando vírgula ou ponto como separador decimal.
+     * Caracteres em branco nas pontas e separadores de milhar comuns no formato
+     * brasileiro (ex.: "1.500,50") são normalizados antes da conversão.
+     *
      * @param label Texto de prompt.
      * @return Double digitado.
      */
     public static double lerDouble(String label) {
-        return Double.parseDouble(ler(label));
+        while (true) {
+            String entrada = ler(label).trim();
+            try {
+                return Double.parseDouble(normalizarDecimal(entrada));
+            } catch (NumberFormatException e) {
+                System.out.println("Entrada inválida. Digite um número (use vírgula ou ponto como separador decimal).");
+            }
+        }
+    }
+
+    /**
+     * Normaliza uma string numérica aceitando vírgula ou ponto como separador
+     * decimal. Se ambos aparecerem, o último símbolo é tratado como o decimal e
+     * o outro é descartado (separador de milhar). String vazia é retornada como
+     * tal para que {@link Double#parseDouble} dispare o erro padrão.
+     *
+     * @param entrada Texto digitado pelo usuário.
+     * @return Texto pronto para {@link Double#parseDouble}.
+     */
+    static String normalizarDecimal(String entrada) {
+        if (entrada == null || entrada.isEmpty()) return entrada;
+        int posVirgula = entrada.lastIndexOf(',');
+        int posPonto = entrada.lastIndexOf('.');
+        if (posVirgula < 0 && posPonto < 0) return entrada;
+        if (posVirgula > posPonto) {
+            // vírgula é o decimal; pontos restantes são separador de milhar
+            return entrada.replace(".", "").replace(',', '.');
+        }
+        // ponto é o decimal; vírgulas restantes são separador de milhar
+        return entrada.replace(",", "");
     }
 
     /**
@@ -77,8 +117,15 @@ public final class ConsoleIO {
      * @return Valor digitado ou atual.
      */
     public static int lerIntOuManter(String label, int atual) {
-        String s = ler(label + " (" + atual + "): ");
-        return s.isEmpty() ? atual : Integer.parseInt(s);
+        while (true) {
+            String s = ler(label + " (" + atual + "): ").trim();
+            if (s.isEmpty()) return atual;
+            try {
+                return Integer.parseInt(s);
+            } catch (NumberFormatException e) {
+                System.out.println("Entrada inválida. Digite um número inteiro ou pressione ENTER para manter \"" + atual + "\".");
+            }
+        }
     }
 
     /**

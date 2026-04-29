@@ -31,4 +31,9 @@ public class Cities {
     public void setCdstate(int cdstate) {
         this.cdstate = cdstate;
     }
+
+    @Override
+    public String toString() {
+        return "ID: " + cdcity + " | " + nmcity;
+    }
 }

@@ -150,6 +150,32 @@ public class ContractDAO {
     }
 
     /**
+     * Lista apenas os contratos que possuem pelo menos uma parte vinculada
+     * (registro em {@code user_contract}). Útil para relatórios que dependem
+     * de participantes — evita listar contratos "fantasma" criados em fluxos
+     * abortados.
+     *
+     * @return Lista formatada "ID: X - Título".
+     */
+    public List<String> getContractsWithParticipantsList() {
+        List<String> list = new ArrayList<>();
+        String sql = "SELECT DISTINCT c.cdcontract, c.dstitle " +
+                     "FROM Contracts c " +
+                     "JOIN User_Contract uc ON uc.cdcontract = c.cdcontract " +
+                     "ORDER BY c.cdcontract";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                list.add("ID: " + rs.getInt("cdcontract") + " - " + rs.getString("dstitle"));
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao listar contratos com partes: " + e.getMessage());
+        }
+        return list;
+    }
+
+    /**
      * Lista contratos ativos filtrados por tipo (venda/locação/geral).
      * 
      * @param tipo Tipo de filtro desejado.

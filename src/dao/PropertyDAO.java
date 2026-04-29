@@ -60,10 +60,10 @@ public class PropertyDAO {
             ps.setInt(2, idUser);
             
             ps.executeUpdate();
-            System.out.println("Owner successfully linked to the property!");
+            System.out.println("Proprietário vinculado ao imóvel com sucesso!");
             
         } catch (SQLException e) {
-            System.err.println("Error linking owner to property: " + e.getMessage());
+            System.err.println("Erro ao vincular proprietário ao imóvel: " + e.getMessage());
         }
     }
 
