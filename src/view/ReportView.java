@@ -25,40 +25,42 @@ public class ReportView {
      */
     public void menu() {
         System.out.println("\n--- MÓDULO DE RELATÓRIOS ---");
-        System.out.println("1. Imóveis por Bairro");
-        System.out.println("2. Relatório Financeiro de Locação");
-        System.out.println("3. Relatório Financeiro de Venda");
-        System.out.println("4. Relatório de Partes do Contrato");
-        System.out.println("5. Relatório de Reajustes do Ano");
-        System.out.println("6. Listagem Geral (JOINS)");
-        System.out.println("7. Fluxo de Caixa Mensal e Adimplência");
-        
+        System.out.println("1. Relatório Financeiro de Locação");
+        System.out.println("2. Relatório Financeiro de Venda");
+        System.out.println("3. Relatório de Partes do Contrato");
+        System.out.println("4. Relatório de Reajustes do Ano");
+        System.out.println("5. Listagem Geral de Imóveis (JOINS, com filtro opcional por bairro)");
+        System.out.println("6. Fluxo de Caixa Mensal e Adimplência");
+
         switch (lerIntSeguro("Escolha: ")) {
-            case 1: propertyDAO.relatorioImoveisPorBairro(); break;
-            case 2: 
+            case 1:
                 int idLoc = lerIdValido("ID do Contrato de Locação", 
                     contractDAO::findById, 
                     () -> contractDAO.getActiveContractsList("locação").forEach(System.out::println));
                 if (idLoc > 0) reportService.gerarRelatorioFinanceiroLocacao(idLoc);
                 break;
-            case 3: 
+            case 2:
                 int idVen = lerIdValido("ID do Contrato de Venda", 
                     contractDAO::findById, 
                     () -> contractDAO.getActiveContractsList("venda").forEach(System.out::println));
                 if (idVen > 0) reportService.gerarRelatorioFinanceiroVenda(idVen);
                 break;
-            case 4: 
+            case 3:
                 int idPart = lerIdValido("ID do Contrato (Partes)", 
                     contractDAO::findById, 
                     () -> contractDAO.getActiveContractsList("geral").forEach(System.out::println));
                 if (idPart > 0) reportService.gerarRelatorioPartesContrato(idPart);
                 break;
-            case 5:
+            case 4:
                 System.out.println("\nBuscando reajustes previstos para o mês atual...");
                 reportService.gerarRelatorioReajustesDoMes();
                 break;
-            case 6: propertyDAO.relatorioCompletoImoveis(); break;
-            case 7:
+            case 5: {
+                String filtroBairro = ler("Filtrar por bairro (ou [ENTER] para listar todos): ");
+                propertyDAO.relatorioCompletoImoveis(filtroBairro);
+                break;
+            }
+            case 6:
                 System.out.println("\nMODO DO RELATÓRIO DE FLUXO DE CAIXA:");
                 System.out.println("1. Visão Geral (Todos os Contratos)");
                 System.out.println("2. Visão de Contrato Específico");

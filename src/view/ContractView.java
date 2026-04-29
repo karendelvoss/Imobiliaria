@@ -292,15 +292,16 @@ public class ContractView {
             } else i--;
         }
 
-        int cdproperty = lerIdValido("Selecionar Imóvel",
-                propertyDAO::findById,
-                () -> propertyDAO.getAvailableProperties().forEach(System.out::println),
-                propertyView::cadastrar);
+        int cdproperty = selecionarImovelComProprietario();
 
-        if (cdproperty > 0) {
-            contract.setCdproperty(cdproperty);
-            contractDAO.updateContract(contract);
+        if (cdproperty <= 0) {
+            System.out.println("Seleção de imóvel cancelada. Revertendo contrato #" + cdcontract + "...");
+            contractDAO.deleteContract(cdcontract);
+            return;
         }
+
+        contract.setCdproperty(cdproperty);
+        contractDAO.updateContract(contract);
 
         System.out.println("\n--- DADOS DO TABELIONATO ---");
         model.Notaries n = new model.Notaries();
@@ -389,6 +390,22 @@ public class ContractView {
         }
     }
 
+    private int selecionarImovelComProprietario() {
+        while (true) {
+            int idP = lerIdValido("Selecionar Imóvel",
+                    propertyDAO::findById,
+                    () -> propertyDAO.getAvailableProperties().forEach(System.out::println),
+                    propertyView::cadastrar);
+            if (idP <= 0) return idP;
+            if (propertyDAO.countOwners(idP) <= 0) {
+                System.out.println("ERRO: este imóvel não possui proprietário cadastrado. "
+                        + "Vincule um proprietário antes de criar um contrato. Escolha outro imóvel ou cancele.");
+                continue;
+            }
+            return idP;
+        }
+    }
+
     private void vincularDono() {
         int idP = lerIdValido("ID Imóvel", propertyDAO::findById, () -> propertyDAO.getAvailableProperties().forEach(System.out::println));
         int idU = lerIdValido("ID Usuário", userDAO::findById, () -> userDAO.getAllUsersList().forEach(System.out::println));
@@ -400,6 +417,11 @@ public class ContractView {
     private void desvincularDono() {
         int idP = lerIdValido("ID Imóvel", propertyDAO::findById, () -> propertyDAO.getPropertiesWithOwners().forEach(System.out::println));
         if (idP <= 0) return;
+        if (propertyDAO.hasActiveContract(idP)) {
+            System.out.println("ERRO: este imóvel possui contrato(s) ativo(s). "
+                    + "Encerre os contratos antes de desvincular o proprietário.");
+            return;
+        }
         int idU = lerIdValido("ID Usuário", id -> propertyDAO.hasAlreadyThisOwner(idP, id) ? id : null, () -> propertyDAO.getOwnersByProperty(idP).forEach(System.out::println));
         if (idU > 0 && confirmar("Desvincular? (s/n): ")) {
             propertyDAO.unlinkOwner(idP, idU);

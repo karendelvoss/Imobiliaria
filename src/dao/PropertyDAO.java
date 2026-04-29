@@ -172,46 +172,6 @@ public class PropertyDAO {
     }
 
     /**
-     * Exibe no console um relatório de imóveis agrupados por bairro.
-     */
-    public void relatorioImoveisPorBairro() {
-        String sql = "SELECT p.cdproperty, p.nrregistration, p.dsdescription, " +
-                     "d.nmdistrict, c.nmcity " +
-                     "FROM Properties p " +
-                     "JOIN Addresses a ON p.cdaddress = a.cdaddress " +
-                     "JOIN Districts d ON a.cddistrict = d.cddistrict " +
-                     "JOIN Cities c ON d.cdcity = c.cdcity " +
-                     "ORDER BY d.nmdistrict";
-
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-
-            System.out.println("\n--- RELATÓRIO: IMÓVEIS POR LOCALIZAÇÃO ---");
-            System.out.println("------------------------------------------------------------");
-            
-            boolean encontrou = false;
-            while (rs.next()) {
-                encontrou = true;
-                System.out.printf("ID: %d | Reg: %s | Bairro: %-15s | Cidade: %s | Desc: %s\n",
-                        rs.getInt("cdproperty"),
-                        rs.getString("nrregistration"),
-                        rs.getString("nmdistrict"),
-                        rs.getString("nmcity"),
-                        rs.getString("dsdescription"));
-            }
-            
-            if (!encontrou) {
-                System.out.println("Nenhum imóvel encontrado no banco de dados.");
-            }
-            System.out.println("------------------------------------------------------------");
-
-        } catch (SQLException e) {
-            System.err.println("Erro ao gerar relatório de bairros: " + e.getMessage());
-        }
-    }
-
-    /**
      * Retorna uma lista de imóveis disponíveis para vinculação.
      * 
      * @return Lista de Strings formatadas com ID e Matrícula.
@@ -280,6 +240,28 @@ public class PropertyDAO {
             e.printStackTrace();
         }
         return 0;
+    }
+
+    /**
+     * Verifica se o imóvel possui ao menos um contrato vigente vinculado
+     * (qualquer status diferente de FINALIZADO — inclui ATIVO e INDETERMINADO).
+     *
+     * @param idProperty Identificador do imóvel.
+     * @return {@code true} se existir pelo menos um contrato vigente.
+     */
+    public boolean hasActiveContract(int idProperty) {
+        String sql = "SELECT 1 FROM contracts WHERE cdproperty = ? AND cdstatus <> ? LIMIT 1";
+        try (Connection conn = Conexao.getConexao();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, idProperty);
+            ps.setInt(2, model.ContractStatus.FINALIZADO.getCode());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            System.err.println("Erro ao verificar contratos ativos do imóvel: " + e.getMessage());
+            return false;
+        }
     }
 
     /**
@@ -467,28 +449,68 @@ public class PropertyDAO {
     }
 
     /**
-     * Exibe no console um relatório completo de todos os imóveis cadastrados.
+     * Exibe no console um relatório completo de todos os imóveis cadastrados,
+     * com opção de filtragem por bairro.
+     *
+     * @param filtroBairro Nome (ou parte) do bairro para filtrar. Use {@code null}
+     *                     ou string vazia para listar todos os imóveis.
      */
-    public void relatorioCompletoImoveis() {
-        String sql = "SELECT p.cdproperty, p.nrregistration, t.nmtype, s.nmstatus, a.nmstreet, a.nraddress " +
+    public void relatorioCompletoImoveis(String filtroBairro) {
+        boolean comFiltro = filtroBairro != null && !filtroBairro.isBlank();
+
+        String sql = "SELECT p.cdproperty, p.nrregistration, t.nmtype, s.nmstatus, " +
+                     "a.nmstreet, a.nraddress, d.nmdistrict, c.nmcity " +
                      "FROM properties p " +
                      "JOIN property_types t ON p.cdtype = t.cdtype " +
                      "JOIN property_status s ON p.cdstatus = s.cdstatus " +
-                     "JOIN addresses a ON p.cdaddress = a.cdaddress ORDER BY p.cdproperty";
+                     "JOIN addresses a ON p.cdaddress = a.cdaddress " +
+                     "JOIN districts d ON a.cddistrict = d.cddistrict " +
+                     "JOIN cities c ON d.cdcity = c.cdcity " +
+                     (comFiltro ? "WHERE LOWER(d.nmdistrict) LIKE ? " : "") +
+                     "ORDER BY d.nmdistrict, p.cdproperty";
+
         try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            
-            System.out.println("\nID  | MATRÍCULA | TIPO           | STATUS     | ENDEREÇO COMPLETO");
-            System.out.println("--------------------------------------------------------------------------------------");
-            while (rs.next()) {
-                String enderecoCompleto = rs.getString("nmstreet") + ", nº " + rs.getString("nraddress");
-                System.out.printf("%-3d | %-9s | %-14s | %-10s | %s\n", 
-                    rs.getInt("cdproperty"), rs.getString("nrregistration"), 
-                    rs.getString("nmtype"), rs.getString("nmstatus"), enderecoCompleto);
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            if (comFiltro) {
+                ps.setString(1, "%" + filtroBairro.toLowerCase() + "%");
             }
-        } catch (SQLException e) { 
+
+            try (ResultSet rs = ps.executeQuery()) {
+                String titulo = comFiltro
+                        ? "RELATÓRIO: IMÓVEIS (Bairro contém \"" + filtroBairro + "\")"
+                        : "RELATÓRIO: LISTAGEM GERAL DE IMÓVEIS";
+                System.out.println("\n--- " + titulo + " ---");
+                System.out.printf("%-3s | %-9s | %-14s | %-10s | %-18s | %-15s | %s%n",
+                        "ID", "MATRÍCULA", "TIPO", "STATUS", "BAIRRO", "CIDADE", "ENDEREÇO");
+                System.out.println("--------------------------------------------------------------------------------------------------------");
+
+                boolean encontrou = false;
+                while (rs.next()) {
+                    encontrou = true;
+                    String enderecoCompleto = rs.getString("nmstreet") + ", nº " + rs.getString("nraddress");
+                    System.out.printf("%-3d | %-9s | %-14s | %-10s | %-18s | %-15s | %s%n",
+                            rs.getInt("cdproperty"), rs.getString("nrregistration"),
+                            rs.getString("nmtype"), rs.getString("nmstatus"),
+                            rs.getString("nmdistrict"), rs.getString("nmcity"),
+                            enderecoCompleto);
+                }
+
+                if (!encontrou) {
+                    System.out.println(comFiltro
+                            ? "Nenhum imóvel encontrado para o bairro informado."
+                            : "Nenhum imóvel cadastrado.");
+                }
+            }
+        } catch (SQLException e) {
             System.err.println("Erro no relatório: " + e.getMessage());
         }
+    }
+
+    /**
+     * Sobrecarga conveniente — lista todos os imóveis sem filtro de bairro.
+     */
+    public void relatorioCompletoImoveis() {
+        relatorioCompletoImoveis(null);
     }
 }

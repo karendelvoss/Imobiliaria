@@ -130,23 +130,34 @@ docker volume rm postgres-imobiliaria-data      # apagar todos os dados (cuidado
 
 #### B.2. Restaurar o schema (`backup.sql`)
 
+Os arquivos `backup.sql` e `insert.sql` são dumps **plain SQL** gerados pelo `pg_dump`. O caminho equivalente ao "restore" no pgAdmin para esse formato é o **PSQL Tool** (terminal `psql` integrado).
+
 1. Expanda **Servers → Imobiliaria → Databases → postgres**.
-2. Clique com o direito em **postgres → Query Tool**.
-3. Na barra superior do Query Tool, clique no ícone de pasta (**Open File**) e selecione `database/backup.sql`.
-4. Clique em **Execute/Run** (botão ▶ ou `F5`).
-5. Atualize (clique direito em **Schemas → public → Tables → Refresh**) — as tabelas devem aparecer.
+2. Selecione o banco **postgres** e, na barra de ferramentas do pgAdmin, clique em **PSQL Tool** (ícone de terminal). Uma sessão `psql` conectada ao banco é aberta.
+3. No prompt `postgres=#`, execute o restore do schema apontando para o caminho absoluto do arquivo:
+
+   ```sql
+   \i '/caminho/para/Imobiliaria/database/backup.sql'
+   ```
+
+   > No Windows, use barras normais ou escape: `\i 'C:/Users/voce/Imobiliaria/database/backup.sql'`.
+4. Atualize a árvore: clique com o direito em **Schemas → public → Tables → Refresh** — as tabelas devem aparecer.
 
 #### B.3. Carregar os dados (`insert.sql`)
 
-1. Ainda no **Query Tool** apontado para o banco `postgres`.
-2. Abra `database/insert.sql` (ícone de pasta).
-3. Execute (▶ / `F5`).
-4. Verifique consultando, por exemplo:
+1. Ainda no **PSQL Tool** conectado ao banco `postgres`, execute:
+
+   ```sql
+   \i '/caminho/para/Imobiliaria/database/insert.sql'
+   ```
+2. Verifique consultando, por exemplo:
 
    ```sql
    SELECT COUNT(*) FROM users;
    SELECT COUNT(*) FROM properties;
    ```
+
+> **Alternativa (Restore...)** — se você converter os dumps para o formato custom (`pg_dump -Fc -f backup.dump`), pode usar o assistente gráfico clicando com o direito no banco **postgres → Restore...**, escolhendo o arquivo `.dump` e clicando em **Restore**. O assistente **Restore...** do pgAdmin **não aceita** arquivos `.sql` em formato plain — por isso o procedimento padrão usa o PSQL Tool acima.
 
 > Se a sua instância roda na porta `5432`, ajuste `URL` em `Conexao.java` para `jdbc:postgresql://localhost:5432/postgres`.
 
