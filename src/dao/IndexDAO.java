@@ -1,113 +1,135 @@
 package dao;
 
 import model.Indexes;
-import java.sql.*;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.result.DeleteResult;
+import org.bson.Document;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Gerencia as operações de persistência para os índices financeiros.
+ * Usa a coleção "indexes" no MongoDB com IDs sequenciais via SequenceGenerator.
  */
 public class IndexDAO {
 
+    private static final String COLLECTION_NAME = "indexes";
+
+    /**
+     * Obtém a coleção MongoDB de índices.
+     *
+     * @return MongoCollection de Documents.
+     */
+    private MongoCollection<Document> getCollection() {
+        return Conexao.getCollection(COLLECTION_NAME);
+    }
+
+    /**
+     * Converte um objeto Indexes para Document BSON.
+     *
+     * @param obj Objeto do modelo.
+     * @return Document BSON correspondente.
+     */
+    Document toDocument(Indexes obj) {
+        Document doc = new Document();
+        doc.append("_id", obj.getCdindex());
+        doc.append("nmindex", obj.getNmindex());
+        return doc;
+    }
+
+    /**
+     * Converte um Document BSON para objeto Indexes.
+     *
+     * @param doc Document BSON.
+     * @return Objeto do modelo Indexes.
+     */
+    Indexes fromDocument(Document doc) {
+        Indexes idx = new Indexes();
+        idx.setCdindex(doc.getInteger("_id"));
+        idx.setNmindex(doc.getString("nmindex"));
+        return idx;
+    }
+
     /**
      * Insere um novo índice financeiro.
-     * 
-     * @param idx Objeto contendo os dados do índice.
+     * Gera um ID sequencial via SequenceGenerator e atribui ao objeto.
+     *
+     * @param obj Objeto contendo os dados do índice.
      */
-    public void insert(Indexes idx) {
-        String sql = "INSERT INTO Indexes (nmindex) VALUES (?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, idx.getNmindex());
-            ps.executeUpdate();
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) idx.setCdindex(keys.getInt(1));
-            }
-            System.out.println("Índice inserido com sucesso! (ID: " + idx.getCdindex() + ")");
-        } catch (SQLException e) {
-            e.printStackTrace();
+    public void insert(Indexes obj) {
+        try {
+            int id = SequenceGenerator.getNextSequence(COLLECTION_NAME);
+            obj.setCdindex(id);
+            getCollection().insertOne(toDocument(obj));
+            System.out.println("Índice inserido com sucesso! (ID: " + obj.getCdindex() + ")");
+        } catch (Exception e) {
+            System.err.println("Erro ao inserir índice: " + e.getMessage());
         }
     }
 
     /**
      * Busca um índice financeiro pelo ID.
-     * 
+     *
      * @param id Identificador do índice.
-     * @return Objeto Indexes ou null.
+     * @return Objeto Indexes ou null se não encontrado.
      */
     public Indexes findById(int id) {
-        String sql = "SELECT * FROM Indexes WHERE cdindex = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    Indexes idx = new Indexes();
-                    idx.setCdindex(rs.getInt("cdindex"));
-                    idx.setNmindex(rs.getString("nmindex"));
-                    return idx;
-                }
+        try {
+            Document doc = getCollection().find(Filters.eq("_id", id)).first();
+            if (doc != null) {
+                return fromDocument(doc);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar índice por ID: " + e.getMessage());
         }
         return null;
     }
 
     /**
      * Lista todos os índices financeiros cadastrados.
-     * 
+     *
      * @return Lista de objetos Indexes.
      */
     public List<Indexes> listAll() {
         List<Indexes> list = new ArrayList<>();
-        String sql = "SELECT * FROM Indexes";
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                Indexes idx = new Indexes();
-                idx.setCdindex(rs.getInt("cdindex"));
-                idx.setNmindex(rs.getString("nmindex"));
-                list.add(idx);
+        try (MongoCursor<Document> cursor = getCollection().find().iterator()) {
+            while (cursor.hasNext()) {
+                list.add(fromDocument(cursor.next()));
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Erro ao listar índices: " + e.getMessage());
         }
         return list;
     }
 
     /**
      * Atualiza os dados de um índice financeiro.
-     * 
-     * @param idx Objeto contendo os dados atualizados.
+     *
+     * @param obj Objeto contendo os dados atualizados.
      */
-    public void update(Indexes idx) {
-        String sql = "UPDATE Indexes SET nmindex=? WHERE cdindex=?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, idx.getNmindex());
-            ps.setInt(2, idx.getCdindex());
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+    public void update(Indexes obj) {
+        try {
+            Document updateDoc = new Document("$set", new Document("nmindex", obj.getNmindex()));
+            getCollection().updateOne(Filters.eq("_id", obj.getCdindex()), updateDoc);
+        } catch (Exception e) {
+            System.err.println("Erro ao atualizar índice: " + e.getMessage());
         }
     }
 
     /**
      * Exclui um índice financeiro pelo seu identificador.
-     * 
+     *
      * @param id Identificador do índice.
      * @return true se excluído com sucesso.
      */
     public boolean delete(int id) {
-        String sql = "DELETE FROM Indexes WHERE cdindex = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
+        try {
+            DeleteResult result = getCollection().deleteOne(Filters.eq("_id", id));
+            return result.getDeletedCount() > 0;
+        } catch (Exception e) {
             System.err.println("Erro ao excluir índice: " + e.getMessage());
             return false;
         }

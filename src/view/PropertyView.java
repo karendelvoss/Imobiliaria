@@ -1,15 +1,12 @@
 package view;
 
-import dao.Conexao;
+import dao.AddressDAO;
 import dao.PropertyDAO;
+import dao.PropertyTypeDAO;
+import dao.PropertyPurposeDAO;
+import dao.PropertyStatusDAO;
 import model.Properties;
 import dao.UserDAO;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 
 import static view.ConsoleIO.*;
 
@@ -154,63 +151,48 @@ public class PropertyView {
     }
 
     private boolean checkExists(String tableName, String idColumnName, int id) {
-        String sql = "SELECT 1 FROM " + tableName + " WHERE " + idColumnName + " = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            return false;
+        switch (tableName) {
+            case "Addresses":
+                AddressDAO addressDAO = new AddressDAO();
+                return addressDAO.findById(id) != null;
+            case "Property_Types":
+                PropertyTypeDAO typeDAO = new PropertyTypeDAO();
+                return typeDAO.findById(id) != null;
+            case "Property_Purposes":
+                PropertyPurposeDAO purposeDAO = new PropertyPurposeDAO();
+                return purposeDAO.findById(id) != null;
+            case "Property_Status":
+                PropertyStatusDAO statusDAO = new PropertyStatusDAO();
+                return statusDAO.findById(id) != null;
+            default:
+                return false;
         }
     }
 
     private void listAddresses() {
-        String sql = "SELECT cdaddress, nmstreet, nraddress FROM Addresses ORDER BY cdaddress";
         System.out.println("\n--- ENDEREÇOS DISPONÍVEIS ---");
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                System.out.println("ID: " + rs.getInt("cdaddress") + " | " + rs.getString("nmstreet") + ", " + rs.getString("nraddress"));
-            }
-        } catch (SQLException e) { System.out.println("Erro ao buscar endereços."); }
+        AddressDAO addressDAO = new AddressDAO();
+        addressDAO.listAllFormatted().forEach(System.out::println);
     }
 
     private void listPropertyTypes() {
-        String sql = "SELECT cdtype, nmtype FROM Property_Types ORDER BY cdtype";
         System.out.println("\n--- TIPOS DE IMÓVEL DISPONÍVEIS ---");
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                System.out.println("ID: " + rs.getInt("cdtype") + " | " + rs.getString("nmtype"));
-            }
-        } catch (SQLException e) { System.out.println("Erro ao buscar tipos de imóvel."); }
+        PropertyTypeDAO typeDAO = new PropertyTypeDAO();
+        typeDAO.listAll().forEach(pt ->
+            System.out.println("ID: " + pt.getCdtype() + " | " + pt.getNmtype()));
     }
 
     private void listPropertyPurposes() {
-        String sql = "SELECT cdpurpose, nmpurpose FROM Property_Purposes ORDER BY cdpurpose";
         System.out.println("\n--- FINALIDADES DISPONÍVEIS ---");
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                System.out.println("ID: " + rs.getInt("cdpurpose") + " | " + rs.getString("nmpurpose"));
-            }
-        } catch (SQLException e) { System.out.println("Erro ao buscar finalidades."); }
+        PropertyPurposeDAO purposeDAO = new PropertyPurposeDAO();
+        purposeDAO.listAll().forEach(pp ->
+            System.out.println("ID: " + pp.getCdpurpose() + " | " + pp.getNmpurpose()));
     }
 
     private void listPropertyStatus() {
-        String sql = "SELECT cdstatus, nmstatus FROM Property_Status ORDER BY cdstatus";
         System.out.println("\n--- STATUS DISPONÍVEIS ---");
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                System.out.println("ID: " + rs.getInt("cdstatus") + " | " + rs.getString("nmstatus"));
-            }
-        } catch (SQLException e) { System.out.println("Erro ao buscar status."); }
+        PropertyStatusDAO statusDAO = new PropertyStatusDAO();
+        statusDAO.listAll().forEach(ps ->
+            System.out.println("ID: " + ps.getCdstatus() + " | " + ps.getNmstatus()));
     }
 }

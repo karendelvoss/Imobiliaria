@@ -18,6 +18,9 @@ import java.time.temporal.ChronoUnit;
 
 /**
  * Serviço responsável pela geração de documentos PDF para modelos de contrato e contratos preenchidos.
+ *
+ * Adaptado para MongoDB: endereços são subdocumentos embarcados em users/properties,
+ * profissões são texto embarcado em users, bairro e cidade são campos texto no endereço.
  */
 public class ContractPdfService {
 
@@ -29,8 +32,6 @@ public class ContractPdfService {
     private final UserDAO userDAO;
     private final UserContractDAO userContractDAO;
     private final AddressDAO addressDAO;
-    private final DistrictDAO districtDAO;
-    private final CityDAO cityDAO;
     private final InstallmentDAO installmentDAO;
     private final BankAccountDAO bankAccountDAO;
     private final IndexDAO indexDAO;
@@ -39,8 +40,8 @@ public class ContractPdfService {
 
     public ContractPdfService(ContractTemplateDAO templateDAO, TopicDAO topicDAO, ClauseDAO clauseDAO,
                                 ContractDAO contractDAO, PropertyDAO propertyDAO, UserDAO userDAO, 
-                                UserContractDAO userContractDAO, AddressDAO addressDAO, DistrictDAO districtDAO,
-                                CityDAO cityDAO, InstallmentDAO installmentDAO, BankAccountDAO bankAccountDAO,
+                                UserContractDAO userContractDAO, AddressDAO addressDAO,
+                                InstallmentDAO installmentDAO, BankAccountDAO bankAccountDAO,
                                 IndexDAO indexDAO, NotaryDAO notaryDAO, OccupationDAO occupationDAO) {
         this.templateDAO = templateDAO;
         this.topicDAO = topicDAO;
@@ -50,8 +51,6 @@ public class ContractPdfService {
         this.userDAO = userDAO;
         this.userContractDAO = userContractDAO;
         this.addressDAO = addressDAO;
-        this.districtDAO = districtDAO;
-        this.cityDAO = cityDAO;
         this.installmentDAO = installmentDAO;
         this.bankAccountDAO = bankAccountDAO;
         this.indexDAO = indexDAO;
@@ -164,18 +163,14 @@ public class ContractPdfService {
             vars.put("%area_privativa%", String.format("%.2f", property.getVltotalarea()));
             vars.put("%area_comum%", "0,00");
             
-            Addresses addr = addressDAO.findById(property.getCdaddress());
+            // No MongoDB, endereço está embarcado no imóvel (property._id == cdaddress)
+            Addresses addr = addressDAO.findById(property.getCdproperty());
             if (addr != null) {
                 vars.put("%rua_imovel%", addr.getNmstreet());
                 vars.put("%numero_imovel%", addr.getNraddress());
-                Districts dist = districtDAO.findById(addr.getCddistrict());
-                if (dist != null) {
-                    vars.put("%bairro_imovel%", dist.getNmdistrict());
-                    Cities city = cityDAO.findById(dist.getCdcity());
-                    if (city != null) {
-                        vars.put("%cidade_imovel%", city.getNmcity());
-                    }
-                }
+                // Bairro e cidade são campos texto no endereço embarcado
+                vars.put("%bairro_imovel%", addr.getDistrict() != null ? addr.getDistrict() : "N/A");
+                vars.put("%cidade_imovel%", addr.getCity() != null ? addr.getCity() : "N/A");
             }
         }
 
@@ -205,8 +200,10 @@ public class ContractPdfService {
             vars.put("%telefone_locador%", locador.getNrcellphone());
             vars.put("%email_locador%", "nao_informado@email.com");
             
-            Bank_Accounts ba = bankAccountDAO.findByUserId(locador.getCduser());
-            if (ba != null) {
+            // No MongoDB, findByUserId retorna List<Bank_Accounts>
+            List<Bank_Accounts> accounts = bankAccountDAO.findByUserId(locador.getCduser());
+            if (accounts != null && !accounts.isEmpty()) {
+                Bank_Accounts ba = accounts.get(0);
                 vars.put("%titular_conta%", locador.getNmuser());
                 vars.put("%cpf_titular%", locador.getDocument());
                 vars.put("%agencia%", ba.getNragency());
@@ -233,15 +230,14 @@ public class ContractPdfService {
             // Se o representante for o filho, preenchemos o marcador %filho% também
             vars.put("%filho%", representante.getNmuser());
             
-            if (representante.getCdoccupation() > 0) {
-                Occupations occ = occupationDAO.findById(representante.getCdoccupation());
-                if (occ != null) {
-                    vars.put("%estado_civil_e_profissao_filho%", "brasileiro, " + occ.getNmoccupation());
-                } else {
-                    vars.put("%estado_civil_e_profissao_filho%", "brasileiro, Profissão não informada");
-                }
+            // No MongoDB, profissão é texto embarcado em users.occupation
+            // Buscamos o endereço do usuário (que contém dados embarcados) para verificar
+            // e usamos o campo occupation diretamente via lookup no MongoDB
+            String occupationName = getOccupationFromUser(representante.getCduser());
+            if (occupationName != null && !occupationName.isBlank()) {
+                vars.put("%estado_civil_e_profissao_filho%", "brasileiro, " + occupationName);
             } else {
-                vars.put("%estado_civil_e_profissao_filho%", "brasileiro");
+                vars.put("%estado_civil_e_profissao_filho%", "brasileiro, Profissão não informada");
             }
         }
 
@@ -257,10 +253,12 @@ public class ContractPdfService {
                 vars.put("%numero_tabelionato%", String.valueOf(notary.getNrnotary()));
                 if (notary.getDt() != null) vars.put("%data_tabelionato%", notary.getDt().format(df));
                 
-                Cities notaryCity = cityDAO.findById(notary.getCdcity());
+                // No MongoDB, cidade do tabelionato é obtida via CityDAO (ID virtual)
+                // ou diretamente se estiver embarcada. Usamos CityDAO com ID virtual.
+                String notaryCity = getNotaryCityName(notary.getCdcity());
                 if (notaryCity != null) {
-                    vars.put("%cidade_tabelionato%", notaryCity.getNmcity());
-                    vars.put("%cidade tabelionato%", notaryCity.getNmcity());
+                    vars.put("%cidade_tabelionato%", notaryCity);
+                    vars.put("%cidade tabelionato%", notaryCity);
                 }
             }
         }
@@ -349,5 +347,49 @@ public class ContractPdfService {
         } catch (Exception e) {
             System.err.println("Erro ao gerar o PDF do contrato: " + e.getMessage());
         }
+    }
+
+    /**
+     * Obtém o nome da profissão diretamente do documento do usuário no MongoDB.
+     * No modelo embarcado, a profissão é um campo texto "occupation" no documento do usuário.
+     *
+     * @param userId Identificador do usuário.
+     * @return Nome da profissão ou null.
+     */
+    private String getOccupationFromUser(int userId) {
+        try {
+            com.mongodb.client.MongoCollection<org.bson.Document> users = Conexao.getCollection("users");
+            org.bson.Document userDoc = users.find(
+                com.mongodb.client.model.Filters.eq("_id", userId)
+            ).first();
+            if (userDoc != null) {
+                return userDoc.getString("occupation");
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar profissão do usuário: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Obtém o nome da cidade para o tabelionato.
+     * No MongoDB, cidades são texto embarcado nos endereços. O cdcity do Notary
+     * corresponde a um ID virtual na lista de cidades distintas do CityDAO.
+     * Se não encontrar via ID virtual, retorna null para usar o fallback.
+     *
+     * @param cdcity Identificador virtual da cidade.
+     * @return Nome da cidade ou null.
+     */
+    private String getNotaryCityName(int cdcity) {
+        try {
+            CityDAO cityDAO = new CityDAO();
+            Cities city = cityDAO.findById(cdcity);
+            if (city != null) {
+                return city.getNmcity();
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar cidade do tabelionato: " + e.getMessage());
+        }
+        return null;
     }
 }

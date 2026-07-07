@@ -1,122 +1,184 @@
 package dao;
 
 import model.States;
-import java.sql.*;
+import com.mongodb.client.MongoCollection;
+import org.bson.Document;
+
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Gerencia as operações de persistência para a entidade de Estados.
+ *
+ * Na modelagem MongoDB, estados são texto embarcado no campo "address.state"
+ * das coleções "users" e "properties". Não existe coleção separada para estados.
+ * Os métodos extraem valores distintos do campo address.state para manter
+ * compatibilidade com a camada de view.
  */
 public class StateDAO {
 
+    private static final String FIELD = "address.state";
+
     /**
-     * Insere um novo estado no banco de dados.
-     * 
-     * @param s Objeto contendo os dados do estado.
+     * Retorna todos os nomes/siglas de estados distintos encontrados nos endereços embarcados,
+     * combinando dados de users e properties, ordenados alfabeticamente.
+     *
+     * @return Lista ordenada de estados distintos.
      */
-    public void insert(States s) {
-        String sqlInsert = "INSERT INTO States (nmstate, sgstate, cdcountry) VALUES (?, ?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sqlInsert, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, s.getNmstate());
-            ps.setString(2, s.getSgstate());
-            ps.setInt(3, s.getCdcountry());
-            ps.executeUpdate();
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) s.setCdstate(keys.getInt(1));
+    private List<String> getDistinctStates() {
+        Set<String> states = new LinkedHashSet<>();
+        try {
+            MongoCollection<Document> users = Conexao.getCollection("users");
+            for (String val : users.distinct(FIELD, String.class)) {
+                if (val != null && !val.isBlank()) {
+                    states.add(val);
+                }
             }
-            System.out.println("Estado inserido com sucesso! (ID: " + s.getCdstate() + ")");
-        } catch (SQLException e) {
-            e.printStackTrace();
+            MongoCollection<Document> properties = Conexao.getCollection("properties");
+            for (String val : properties.distinct(FIELD, String.class)) {
+                if (val != null && !val.isBlank()) {
+                    states.add(val);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao listar estados distintos: " + e.getMessage());
         }
+        List<String> sorted = new ArrayList<>(states);
+        Collections.sort(sorted);
+        return sorted;
     }
 
     /**
-     * Busca um estado pelo seu identificador.
-     * 
-     * @param id Identificador do estado.
+     * Insere um novo estado.
+     * Como estados são texto embarcado nos endereços, esta operação apenas
+     * exibe uma mensagem informativa. O estado será efetivamente registrado
+     * ao ser usado em um endereço de usuário ou imóvel.
+     *
+     * @param s Objeto contendo os dados do estado.
+     */
+    public void insert(States s) {
+        System.out.println("[INFO] No MongoDB, estados são texto embarcado nos endereços de usuários e imóveis.");
+        System.out.println("O estado '" + s.getNmstate() + "' será registrado ao ser usado em um endereço.");
+        List<String> existing = getDistinctStates();
+        s.setCdstate(existing.size() + 1);
+    }
+
+    /**
+     * Busca um estado pelo seu identificador virtual.
+     * O ID corresponde à posição (1-based) na lista alfabética de estados distintos.
+     *
+     * @param id Identificador virtual do estado.
      * @return Objeto States ou null.
      */
     public States findById(int id) {
-        String sql = "SELECT * FROM States WHERE cdstate = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    States s = new States();
-                    s.setCdstate(rs.getInt("cdstate"));
-                    s.setNmstate(rs.getString("nmstate"));
-                    s.setSgstate(rs.getString("sgstate"));
-                    s.setCdcountry(rs.getInt("cdcountry"));
-                    return s;
-                }
+        try {
+            List<String> states = getDistinctStates();
+            if (id >= 1 && id <= states.size()) {
+                States s = new States();
+                s.setCdstate(id);
+                s.setNmstate(states.get(id - 1));
+                s.setSgstate(states.get(id - 1));
+                s.setCdcountry(0);
+                return s;
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar estado por ID: " + e.getMessage());
         }
         return null;
     }
 
     /**
-     * Lista todos os estados cadastrados.
-     * 
-     * @return Lista de objetos States.
+     * Lista todos os estados distintos encontrados nos endereços embarcados.
+     *
+     * @return Lista de objetos States com IDs virtuais.
      */
     public List<States> listAll() {
         List<States> list = new ArrayList<>();
-        String sql = "SELECT * FROM States ORDER BY cdstate";
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
+        try {
+            List<String> states = getDistinctStates();
+            for (int i = 0; i < states.size(); i++) {
                 States s = new States();
-                s.setCdstate(rs.getInt("cdstate"));
-                s.setNmstate(rs.getString("nmstate"));
-                s.setSgstate(rs.getString("sgstate"));
-                s.setCdcountry(rs.getInt("cdcountry"));
+                s.setCdstate(i + 1);
+                s.setNmstate(states.get(i));
+                s.setSgstate(states.get(i));
+                s.setCdcountry(0);
                 list.add(s);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Erro ao listar estados: " + e.getMessage());
         }
         return list;
     }
 
     /**
-     * Atualiza os dados de um estado existente.
-     * 
-     * @param s Objeto contendo os dados atualizados.
+     * Atualiza o nome de um estado em todos os endereços embarcados que o referenciam.
+     *
+     * @param s Objeto contendo o ID virtual e o novo nome do estado.
      */
     public void update(States s) {
-        String sql = "UPDATE States SET nmstate=?, sgstate=?, cdcountry=? WHERE cdstate=?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, s.getNmstate());
-            ps.setString(2, s.getSgstate());
-            ps.setInt(3, s.getCdcountry());
-            ps.setInt(4, s.getCdstate());
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        try {
+            List<String> states = getDistinctStates();
+            int idx = s.getCdstate() - 1;
+            if (idx >= 0 && idx < states.size()) {
+                String oldName = states.get(idx);
+                String newName = s.getNmstate();
+
+                MongoCollection<Document> users = Conexao.getCollection("users");
+                users.updateMany(
+                    new Document(FIELD, oldName),
+                    new Document("$set", new Document(FIELD, newName))
+                );
+
+                MongoCollection<Document> properties = Conexao.getCollection("properties");
+                properties.updateMany(
+                    new Document(FIELD, oldName),
+                    new Document("$set", new Document(FIELD, newName))
+                );
+
+                System.out.println("Estado atualizado com sucesso. Todos os endereços com '"
+                    + oldName + "' foram atualizados para '" + newName + "'.");
+            } else {
+                System.out.println("Nenhum estado encontrado com o ID informado.");
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao atualizar estado: " + e.getMessage());
         }
     }
 
     /**
-     * Exclui um estado pelo seu identificador.
-     * 
-     * @param id Identificador do estado.
-     * @return true se excluído com sucesso.
+     * Exclui um estado dos endereços embarcados.
+     * A exclusão é impedida se existirem endereços que ainda utilizam o valor.
+     *
+     * @param id Identificador virtual do estado.
+     * @return true se a operação foi processada (mesmo que impedida por uso).
      */
     public boolean delete(int id) {
-        String sql = "DELETE FROM States WHERE cdstate = ?";
-        try (Connection conn = Conexao.getConexao(); PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
+        try {
+            List<String> states = getDistinctStates();
+            if (id >= 1 && id <= states.size()) {
+                String name = states.get(id - 1);
+                MongoCollection<Document> users = Conexao.getCollection("users");
+                MongoCollection<Document> properties = Conexao.getCollection("properties");
+
+                long count = users.countDocuments(new Document(FIELD, name))
+                           + properties.countDocuments(new Document(FIELD, name));
+
+                if (count > 0) {
+                    System.err.println("ERRO: Impossível excluir. O estado '" + name
+                        + "' está em uso em " + count + " endereço(s).");
+                } else {
+                    System.out.println("Estado '" + name + "' removido (não estava em uso).");
+                }
+                return true;
+            } else {
+                System.out.println("Nenhum estado encontrado com o ID informado.");
+            }
+        } catch (Exception e) {
             System.err.println("Erro ao excluir estado: " + e.getMessage());
-            return false;
         }
+        return false;
     }
 }

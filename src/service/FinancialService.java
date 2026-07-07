@@ -114,6 +114,9 @@ public class FinancialService {
             return;
         }
 
+        // Garantir que a parcela referencia o contrato correto (necessário para update em embedded array)
+        installment.setFk_Contracts_cdcontract(contract.getCdcontract());
+
         double oldVal = installment.getVladjusted() > 0 ? installment.getVladjusted() : installment.getVlbase();
         
         // Simula o ajuste na memória

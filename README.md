@@ -1,23 +1,132 @@
 # Sistema Imobiliário
 
+Sistema de gestão imobiliária desenvolvido em Java com banco de dados MongoDB.
+
 ## Requisitos
 
 - **Java JDK 17+**
-- **PostgreSQL 14+** (instalado localmente, via Docker ou via pgAdmin)
-- Drivers já incluídos em `dist/lib/` (PostgreSQL JDBC e iText)
+- **MongoDB 7.x** (via Docker ou instalação local)
+- **mongosh** (MongoDB Shell) — para executar o script de inicialização
+- Drivers já incluídos em `dist/lib/` (MongoDB Driver Sync 5.1.0 e iText)
 
 ---
 
-## 1. Compilação e Execução
+## 1. Instalação do MongoDB
 
-### Windows (cmd / PowerShell)
+Escolha **uma** das opções abaixo.
 
-```bat
-javac -encoding UTF-8 -d bin -cp "dist/lib/*" src/model/*.java src/dao/*.java src/view/*.java src/dto/*.java src/service/*.java
-java -cp "bin;dist/lib/*" view.Main
+### Opção A — MongoDB via Docker (recomendado)
+
+#### A.1. Criar o container com Replica Set
+
+O sistema utiliza transações multi-documento, que requerem um replica set configurado.
+
+```bash
+docker run -d \
+  --name mongo-imobiliaria \
+  -p 27017:27017 \
+  mongo:7 --replSet rs0
 ```
 
-> No Windows o separador do classpath é `;`.
+No Windows (cmd), use uma única linha (sem `\`):
+
+```bat
+docker run -d --name mongo-imobiliaria -p 27017:27017 mongo:7 --replSet rs0
+```
+
+#### A.2. Inicializar o Replica Set
+
+```bash
+docker exec mongo-imobiliaria mongosh --eval "rs.initiate()"
+```
+
+Aguarde alguns segundos até o replica set estar pronto. Você pode verificar o status com:
+
+```bash
+docker exec mongo-imobiliaria mongosh --eval "rs.status()"
+```
+
+#### A.3. Comandos úteis
+
+```bash
+docker logs -f mongo-imobiliaria               # ver logs
+docker stop mongo-imobiliaria                   # parar
+docker start mongo-imobiliaria                  # iniciar de novo
+docker exec -it mongo-imobiliaria mongosh       # abrir mongosh interativo
+docker rm -f mongo-imobiliaria                  # remover container (dados perdidos)
+```
+
+---
+
+### Opção B — MongoDB instalação local (Linux/macOS)
+
+#### B.1. Instalar o MongoDB 7.x
+
+**Ubuntu/Debian:**
+
+```bash
+# Importar chave GPG
+curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
+
+# Adicionar repositório
+echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
+
+# Instalar
+sudo apt-get update
+sudo apt-get install -y mongodb-org
+```
+
+**macOS (Homebrew):**
+
+```bash
+brew tap mongodb/brew
+brew install mongodb-community@7.0
+```
+
+#### B.2. Iniciar com Replica Set
+
+O MongoDB deve ser iniciado com suporte a replica set para que transações funcionem:
+
+```bash
+mongod --replSet rs0 --dbpath /var/lib/mongodb --port 27017
+```
+
+Em outro terminal, inicialize o replica set:
+
+```bash
+mongosh --eval "rs.initiate()"
+```
+
+> **Nota:** Para iniciar automaticamente com replica set, adicione `replSetName: rs0` ao arquivo de configuração `/etc/mongod.conf` na seção `replication`.
+
+---
+
+## 2. Inicialização do Banco de Dados
+
+Após o MongoDB estar rodando com replica set configurado, execute o script de inicialização:
+
+```bash
+mongosh database/init-mongo.js
+```
+
+Ou, se estiver usando Docker:
+
+```bash
+docker exec -i mongo-imobiliaria mongosh < database/init-mongo.js
+```
+
+O script realiza:
+- Verificação se o banco `imobiliaria` já existe (evita perda de dados acidental)
+- Criação de todas as coleções necessárias
+- Criação dos índices (incluindo índices únicos)
+- Inicialização dos contadores de IDs sequenciais
+- Inserção dos dados de exemplo
+
+> **Atenção:** Se o banco já existir, o script aborta com um aviso. Para recriar do zero, primeiro remova o banco manualmente: `mongosh --eval "use imobiliaria; db.dropDatabase()"`
+
+---
+
+## 3. Compilação e Execução
 
 ### Linux / macOS / WSL
 
@@ -28,155 +137,231 @@ java -cp "bin:dist/lib/*" view.Main
 
 > No Linux/macOS o separador do classpath é `:`.
 
+### Windows (cmd / PowerShell)
+
+```bat
+javac -encoding UTF-8 -d bin -cp "dist/lib/*" src/model/*.java src/dao/*.java src/view/*.java src/dto/*.java src/service/*.java
+java -cp "bin;dist/lib/*" view.Main
+```
+
+> No Windows o separador do classpath é `;`.
+
 ### Configuração da conexão
 
-Ajuste, se necessário, as credenciais em `src/dao/Conexao.java`:
+A conexão com o MongoDB é configurada em `src/dao/Conexao.java`:
 
 ```java
-private static final String URL = "jdbc:postgresql://localhost:5433/postgres";
-private static final String USER = "postgres";
-private static final String SENHA = "postgres";
+private static final String HOST = "localhost";
+private static final int PORT = 27017;
+private static final String DATABASE = "imobiliaria";
 ```
 
-A porta padrão do PostgreSQL é `5432`. Aqui usamos `5433` para combinar com o container Docker descrito abaixo.
+Por padrão, conecta ao MongoDB na porta `27017` sem autenticação (ambiente de desenvolvimento).
 
 ---
 
-## 2. Banco de Dados
+## 4. Configuração de Replica Set (Transações)
 
-Há duas formas de preparar o banco. Escolha **uma**.
+O sistema utiliza transações multi-documento do MongoDB para garantir consistência em operações que envolvem múltiplas coleções (ex.: registro de contrato + atualização de status do imóvel). Transações requerem um **replica set** configurado.
 
-### Opção A — PostgreSQL via Docker (recomendado)
+### Por que Replica Set?
 
-#### A.1. Criar o container
+- Transações multi-documento só funcionam com replica set ou sharded cluster
+- Mesmo em ambiente de desenvolvimento com um único nó, é necessário configurar como single-node replica set
+- Operações dentro de um mesmo documento (parcelas dentro do contrato, por exemplo) são atômicas por natureza e não precisam de transação
 
-```bash
-docker run -d \
-  --name postgres-imobiliaria \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=postgres \
-  -p 5433:5432 \
-  -v postgres-imobiliaria-data:/var/lib/postgresql/data \
-  postgres:16
-```
-
-No Windows (cmd), use uma única linha (sem `\`):
-
-```bat
-docker run -d --name postgres-imobiliaria -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=postgres -p 5433:5432 -v postgres-imobiliaria-data:/var/lib/postgresql/data postgres:16
-```
-
-#### A.2. Restaurar o schema (backup) e os dados (insert)
-
-Rode a partir da raiz do projeto:
-
-**Linux / macOS / WSL:**
+### Verificar se o Replica Set está ativo
 
 ```bash
-docker exec -i postgres-imobiliaria psql -U postgres -d postgres < database/backup.sql
-docker exec -i postgres-imobiliaria psql -U postgres -d postgres < database/insert.sql
+mongosh --eval "rs.status().ok"
 ```
 
-**Windows (PowerShell):**
-
-```powershell
-Get-Content database/backup.sql | docker exec -i postgres-imobiliaria psql -U postgres -d postgres
-Get-Content database/insert.sql | docker exec -i postgres-imobiliaria psql -U postgres -d postgres
-```
-
-**Windows (cmd):**
-
-```bat
-docker exec -i postgres-imobiliaria psql -U postgres -d postgres < database\backup.sql
-docker exec -i postgres-imobiliaria psql -U postgres -d postgres < database\insert.sql
-```
-
-#### A.3. Verificar
-
-```bash
-docker exec -it postgres-imobiliaria psql -U postgres -d postgres -c "\dt"
-```
-
-Você deve ver a lista de tabelas (`contracts`, `properties`, `users`, etc.).
-
-#### A.4. Comandos úteis
-
-```bash
-docker logs -f postgres-imobiliaria             # ver logs
-docker stop postgres-imobiliaria                # parar
-docker start postgres-imobiliaria               # iniciar de novo
-docker exec -it postgres-imobiliaria psql -U postgres -d postgres   # abrir psql
-docker rm -f postgres-imobiliaria               # remover container
-docker volume rm postgres-imobiliaria-data      # apagar todos os dados (cuidado!)
-```
+Se retornar `1`, o replica set está funcional.
 
 ---
 
-### Opção B — PostgreSQL via pgAdmin (interface gráfica)
+## 5. Estrutura das Coleções (Modelo de Dados)
 
-#### B.1. Criar o servidor de conexão
+O sistema utiliza um modelo orientado a documentos com embedding estratégico para reduzir joins:
 
-1. Abra o **pgAdmin**.
-2. No painel esquerdo, clique com o direito em **Servers → Register → Server...**.
-3. Aba **General**: preencha **Name** com `Imobiliaria`.
-4. Aba **Connection**:
-   - **Host name/address**: `localhost`
-   - **Port**: `5432` (ou `5433` se estiver usando o container Docker)
-   - **Maintenance database**: `postgres`
-   - **Username**: `postgres`
-   - **Password**: `postgres` (marque "Save password")
-5. Clique em **Save**.
+### Coleções Principais
 
-#### B.2. Restaurar o schema (`backup.sql`)
+| Coleção | Descrição | Estratégia |
+|---------|-----------|------------|
+| `users` | Usuários (proprietários, locatários, corretores) | Endereço e profissão embarcados |
+| `properties` | Imóveis | Endereço embarcado; tipo/finalidade/status como texto |
+| `contracts` | Contratos de locação/venda | Parcelas e participantes embarcados |
+| `notifications` | Notificações do sistema | Coleção independente com referências |
+| `contract_templates` | Modelos de contrato | Tópicos e cláusulas embarcados |
+| `indexes` | Índices financeiros (IPCA, IGP-M) | Taxas embarcadas como array |
+| `readjustment_logs` | Logs de reajuste | Coleção independente |
+| `counters` | Contadores de IDs sequenciais | Auxiliar para geração de IDs |
 
-Os arquivos `backup.sql` e `insert.sql` são dumps **plain SQL** gerados pelo `pg_dump`. O caminho equivalente ao "restore" no pgAdmin para esse formato é o **PSQL Tool** (terminal `psql` integrado).
+### Estrutura dos Documentos
 
-1. Expanda **Servers → Imobiliaria → Databases → postgres**.
-2. Selecione o banco **postgres** e, na barra de ferramentas do pgAdmin, clique em **PSQL Tool** (ícone de terminal). Uma sessão `psql` conectada ao banco é aberta.
-3. No prompt `postgres=#`, execute o restore do schema apontando para o caminho absoluto do arquivo:
+#### `users`
+```json
+{
+  "_id": 1,
+  "nmuser": "João Silva",
+  "dtbirth": "1990-05-20",
+  "fgdocument": true,
+  "document": "12345678900",
+  "nrcellphone": "47999999999",
+  "dsissuingbody": "SSP",
+  "address": {
+    "cdzipcode": "89200000",
+    "nmstreet": "Rua XV de Novembro",
+    "nraddress": "1000",
+    "dscomplement": "Sala 2",
+    "district": "Centro",
+    "city": "Joinville",
+    "state": "SC",
+    "country": "Brasil"
+  },
+  "occupation": "Analista de Sistemas",
+  "bank_accounts": [
+    { "nragency": "0001", "nraccount": "12345-6", "nrpixkey": "joao@email.com" }
+  ]
+}
+```
 
-   ```sql
-   \i '/caminho/para/Imobiliaria/database/backup.sql'
-   ```
+#### `properties`
+```json
+{
+  "_id": 1,
+  "nrregistration": "MAT-99887",
+  "dsdescription": "Apto com 2 quartos no centro",
+  "vltotalarea": 65.50,
+  "address": {
+    "cdzipcode": "89200000",
+    "nmstreet": "Rua XV de Novembro",
+    "nraddress": "1000",
+    "district": "Centro",
+    "city": "Joinville",
+    "state": "SC",
+    "country": "Brasil"
+  },
+  "type": "Apartamento",
+  "purpose": "Residencial",
+  "status": "Alugado",
+  "owners": [1]
+}
+```
 
-   > No Windows, use barras normais ou escape: `\i 'C:/Users/voce/Imobiliaria/database/backup.sql'`.
-4. Atualize a árvore: clique com o direito em **Schemas → public → Tables → Refresh** — as tabelas devem aparecer.
+#### `contracts`
+```json
+{
+  "_id": 9,
+  "dtcreation": "2025-04-25",
+  "dstitle": "Contrato Locação",
+  "cdtemplate": 1,
+  "cdproperty": 1,
+  "cdindex": 1,
+  "dtlimit": "2026-04-25",
+  "cdstatus": 1,
+  "notary": null,
+  "participants": [
+    { "cduser": 1, "cdrole": 2, "nmrole": "Locador" },
+    { "cduser": 2, "cdrole": 1, "nmrole": "Locatário" }
+  ],
+  "installments": [
+    {
+      "cdinstallment": 31,
+      "nrinstallment": 1,
+      "dtdue": "2025-05-01",
+      "vlbase": 1200.00,
+      "vladjusted": 0.00,
+      "cdstatus": 2,
+      "dtpayment": "2026-04-25",
+      "vlpenalty": 10.00,
+      "vlinterest": 1.00
+    }
+  ]
+}
+```
 
-#### B.3. Carregar os dados (`insert.sql`)
+#### `contract_templates`
+```json
+{
+  "_id": 1,
+  "nmtemplate": "Contrato de Locação Padrão",
+  "dsversion": "1.0",
+  "fgactive": true,
+  "topics": [
+    {
+      "cdtopic": 1,
+      "nmtopic": "Do Objeto da Locação",
+      "nrorder": 1,
+      "clauses": [
+        { "cdclause": 1, "dstext": "O locador cede ao locatário...", "nrorder": 1 }
+      ]
+    }
+  ]
+}
+```
 
-1. Ainda no **PSQL Tool** conectado ao banco `postgres`, execute:
+#### `indexes`
+```json
+{
+  "_id": 1,
+  "nmindex": "IPCA",
+  "rates": [
+    { "refmonth": 4, "refyear": 2024, "vlrate": 0.0038 },
+    { "refmonth": 5, "refyear": 2024, "vlrate": 0.0046 }
+  ]
+}
+```
 
-   ```sql
-   \i '/caminho/para/Imobiliaria/database/insert.sql'
-   ```
-2. Verifique consultando, por exemplo:
+### Mapeamento PostgreSQL → MongoDB
 
-   ```sql
-   SELECT COUNT(*) FROM users;
-   SELECT COUNT(*) FROM properties;
-   ```
-
-> **Alternativa (Restore...)** — se você converter os dumps para o formato custom (`pg_dump -Fc -f backup.dump`), pode usar o assistente gráfico clicando com o direito no banco **postgres → Restore...**, escolhendo o arquivo `.dump` e clicando em **Restore**. O assistente **Restore...** do pgAdmin **não aceita** arquivos `.sql` em formato plain — por isso o procedimento padrão usa o PSQL Tool acima.
-
-> Se a sua instância roda na porta `5432`, ajuste `URL` em `Conexao.java` para `jdbc:postgresql://localhost:5432/postgres`.
+| Tabelas PostgreSQL originais | Destino no MongoDB |
+|------------------------------|-------------------|
+| countries, states, cities, districts | Embarcados em `address` |
+| addresses | Embarcado em `users` e `properties` |
+| occupations | Campo texto `users.occupation` |
+| users | Coleção `users` |
+| bank_accounts | Array em `users.bank_accounts` |
+| properties, property_types, property_purposes, property_status | Coleção `properties` (tipos como texto) |
+| properties_users | Array `properties.owners` |
+| contracts | Coleção `contracts` |
+| user_contract + roles | Array `contracts.participants` |
+| installments | Array `contracts.installments` |
+| notaries | Subdocumento `contracts.notary` |
+| notifications | Coleção `notifications` |
+| contract_templates + topics + clauses | Coleção `contract_templates` (tudo embarcado) |
+| indexes + index_rates | Coleção `indexes` (rates embarcado) |
 
 ---
 
-## 3. Visualizar PDFs gerados (dentro do VS Code)
+## 6. Executar Testes
 
-O sistema gera PDFs em `pdfs/` (ex.: `pdfs/contrato_preenchido_20.pdf`). PDFs são arquivos binários — abrir com `cat` mostra apenas bytes ilegíveis.
+Os testes utilizam o framework [jqwik](https://jqwik.net/) para property-based testing e JUnit 5 para testes unitários.
 
-Para visualizá-los **dentro do VS Code**, instale a extensão:
+### Compilar testes
+
+```bash
+javac -d bin -cp "dist/lib/*:dist/lib/test/*" $(find src -name "*.java")
+```
+
+### Executar testes
+
+```bash
+java -cp "bin:dist/lib/*:dist/lib/test/*" org.junit.platform.console.ConsoleLauncher --scan-classpath
+```
+
+> **Nota:** Os testes requerem uma instância MongoDB rodando localmente com replica set configurado.
+
+---
+
+## 7. Visualizar PDFs gerados (dentro do VS Code)
+
+O sistema gera PDFs em `pdfs/` (ex.: `pdfs/contrato_preenchido_20.pdf`). Para visualizá-los **dentro do VS Code**, instale a extensão:
 
 - **vscode-pdf** (autor: *tomoki1207*)
-  - Marketplace: <https://marketplace.visualstudio.com/items?itemName=tomoki1207.pdf>
-  - Ou via terminal:
-    ```bash
-    code --install-extension tomoki1207.pdf
-    ```
-
-Depois disso, basta clicar no arquivo `.pdf` no Explorer do VS Code que ele será renderizado.
+  ```bash
+  code --install-extension tomoki1207.pdf
+  ```
 
 Alternativas fora do VS Code:
 
@@ -188,7 +373,7 @@ open pdfs/contrato_preenchido_20.pdf          # macOS
 
 ---
 
-## 4. Introdução explicativa do domínio de informação escolhido
+## 8. Introdução explicativa do domínio de informação escolhido
 
 O domínio escolhido abrange a gestão operacional e financeira de uma imobiliária.
 O sistema visa centralizar o controle de imóveis (cadastros técnicos, metragens e localização), 

@@ -1,14 +1,10 @@
 package view;
 
 import dao.UserDAO;
-import dao.Conexao;
+import dao.AddressDAO;
+import dao.OccupationDAO;
 import model.Users;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -247,56 +243,26 @@ public class UserView {
     }
 
     private boolean checkAddressExists(int id) {
-        String sql = "SELECT 1 FROM Addresses WHERE cdaddress = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            return false;
-        }
+        AddressDAO addressDAO = new AddressDAO();
+        return addressDAO.findById(id) != null;
     }
 
     private void listAddresses() {
-        String sql = "SELECT cdaddress, nmstreet, nraddress FROM Addresses ORDER BY cdaddress";
         System.out.println("\n--- ENDEREÇOS DISPONÍVEIS ---");
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                System.out.println("ID: " + rs.getInt("cdaddress") + " | " + rs.getString("nmstreet") + ", " + rs.getString("nraddress"));
-            }
-        } catch (SQLException e) {
-            System.out.println("Erro ao buscar endereços.");
-        }
+        AddressDAO addressDAO = new AddressDAO();
+        List<String> formatted = addressDAO.listAllFormatted();
+        formatted.forEach(System.out::println);
     }
 
     private boolean checkOccupationExists(int id) {
-        String sql = "SELECT 1 FROM Occupations WHERE cdoccupation = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            return false;
-        }
+        OccupationDAO occupationDAO = new OccupationDAO();
+        return occupationDAO.findById(id) != null;
     }
 
     private void listOccupations() {
-        String sql = "SELECT cdoccupation, nmoccupation FROM Occupations ORDER BY cdoccupation";
         System.out.println("\n--- PROFISSÕES DISPONÍVEIS ---");
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                System.out.println("ID: " + rs.getInt("cdoccupation") + " | " + rs.getString("nmoccupation"));
-            }
-        } catch (SQLException e) {
-            System.out.println("Erro ao buscar profissões.");
-        }
+        OccupationDAO occupationDAO = new OccupationDAO();
+        List<String> occupations = occupationDAO.listAll();
+        occupations.forEach(System.out::println);
     }
 }

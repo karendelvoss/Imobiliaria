@@ -203,7 +203,7 @@ public class AutomationService {
             newInstallments.add(inst);
         }
 
-        installmentDAO.insertBatch(newInstallments);
+        installmentDAO.insertBatch(contract.getCdcontract(), newInstallments);
         System.out.println(newInstallmentsCount + " novas parcelas geradas para a renovação.");
     }
 }

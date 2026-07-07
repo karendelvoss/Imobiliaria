@@ -1,93 +1,134 @@
 package dao;
 
 import model.NotificationChannel;
-import model.NotificationEventType;
 import model.Notifications;
-import java.sql.*;
+
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
+import org.bson.Document;
+
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Gerencia as operações de persistência e lógica de deduplicação de notificações.
+ * Utiliza a coleção independente "notifications" no MongoDB.
  */
 public class NotificationDAO {
 
+    private static final String COLLECTION_NAME = "notifications";
+    private static final String TEMPLATES_COLLECTION = "notification_templates";
+
+    /**
+     * Converte um objeto Notifications para um Document BSON.
+     *
+     * @param n Objeto Notifications.
+     * @return Document BSON representando a notificação.
+     */
+    private Document toDocument(Notifications n) {
+        Document doc = new Document();
+        doc.append("_id", n.getCdnotification());
+        doc.append("dsmessage", n.getDsmessage());
+        doc.append("dtsend", n.getDtsend() != null ? n.getDtsend().toString() : null);
+        doc.append("cdcontract", n.getCdcontract());
+        doc.append("cduser", n.getCduser());
+        doc.append("cdnotificationtemplate", n.getCdnotificationtemplate());
+        doc.append("fgchannel", n.getFgchannel());
+        return doc;
+    }
+
+    /**
+     * Converte um Document BSON para um objeto Notifications.
+     *
+     * @param doc Document BSON.
+     * @return Objeto Notifications preenchido.
+     */
+    private Notifications fromDocument(Document doc) {
+        Notifications n = new Notifications();
+        n.setCdnotification(doc.getInteger("_id"));
+        n.setDsmessage(doc.getString("dsmessage"));
+        String dtsend = doc.getString("dtsend");
+        if (dtsend != null && !dtsend.isEmpty()) {
+            n.setDtsend(LocalDate.parse(dtsend));
+        }
+        n.setCdcontract(doc.getInteger("cdcontract", 0));
+        n.setCduser(doc.getInteger("cduser", 0));
+        n.setCdnotificationtemplate(doc.getInteger("cdnotificationtemplate", 0));
+        n.setFgchannel(doc.getInteger("fgchannel", 0));
+        return n;
+    }
+
     /**
      * Insere uma nova notificação no banco de dados.
-     * 
+     *
      * @param n Objeto contendo os dados da notificação.
      */
     public void insert(Notifications n) {
-        String sql = "INSERT INTO Notifications (dsmessage, dtsend, cdcontract, cduser, cdnotificationtemplate, fgchannel) VALUES (?, ?, ?, ?, ?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, n.getDsmessage());
-            ps.setDate(2, n.getDtsend() != null ? Date.valueOf(n.getDtsend()) : null);
-            ps.setInt(3, n.getCdcontract());
-            ps.setInt(4, n.getCduser());
-            ps.setInt(5, n.getCdnotificationtemplate());
-            ps.setInt(6, n.getFgchannel() > 0 ? n.getFgchannel() : NotificationChannel.EMAIL.getCode());
-            ps.executeUpdate();
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) n.setCdnotification(keys.getInt(1));
+        try {
+            MongoCollection<Document> collection = Conexao.getCollection(COLLECTION_NAME);
+            int id = SequenceGenerator.getNextSequence(COLLECTION_NAME);
+            n.setCdnotification(id);
+            if (n.getFgchannel() <= 0) {
+                n.setFgchannel(NotificationChannel.EMAIL.getCode());
             }
+            collection.insertOne(toDocument(n));
             System.out.println("Notificação inserida com sucesso! (ID: " + n.getCdnotification() + ")");
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao inserir notificação: " + e.getMessage());
         }
     }
 
     /**
      * Busca uma notificação pelo seu identificador.
-     * 
+     *
      * @param id Identificador da notificação.
      * @return Objeto Notifications ou null.
      */
     public Notifications findById(int id) {
-        String sql = "SELECT * FROM Notifications WHERE cdnotification = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return mapRow(rs);
+        try {
+            MongoCollection<Document> collection = Conexao.getCollection(COLLECTION_NAME);
+            Document doc = collection.find(Filters.eq("_id", id)).first();
+            if (doc != null) {
+                return fromDocument(doc);
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar notificação: " + e.getMessage());
         }
         return null;
     }
 
     /**
-     * Lista todas as notificações cadastradas, ordenadas pela data de envio.
-     * 
+     * Lista todas as notificações cadastradas, ordenadas pela data de envio (desc).
+     *
      * @return Lista de objetos Notifications.
      */
     public List<Notifications> listAll() {
         List<Notifications> list = new ArrayList<>();
-        String sql = "SELECT * FROM Notifications ORDER BY dtsend DESC, cdnotification DESC";
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) list.add(mapRow(rs));
-        } catch (SQLException e) {
-            e.printStackTrace();
+        try {
+            MongoCollection<Document> collection = Conexao.getCollection(COLLECTION_NAME);
+            for (Document doc : collection.find()
+                    .sort(Sorts.orderBy(Sorts.descending("dtsend"), Sorts.descending("_id")))) {
+                list.add(fromDocument(doc));
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao listar notificações: " + e.getMessage());
         }
         return list;
     }
 
     /**
      * Exclui uma notificação pelo seu identificador.
-     * 
+     *
      * @param id Identificador da notificação.
      * @return true se excluída com sucesso.
      */
     public boolean delete(int id) {
-        String sql = "DELETE FROM Notifications WHERE cdnotification = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
+        try {
+            MongoCollection<Document> collection = Conexao.getCollection(COLLECTION_NAME);
+            return collection.deleteOne(Filters.eq("_id", id)).getDeletedCount() > 0;
+        } catch (Exception e) {
             System.err.println("Erro ao excluir notificação: " + e.getMessage());
             return false;
         }
@@ -95,25 +136,25 @@ public class NotificationDAO {
 
     /**
      * Verifica se já existe uma notificação com os mesmos parâmetros básicos na data informada.
-     * 
+     * Usado para deduplicação — evita criar notificações duplicadas.
+     *
      * @param cdcontract Identificador do contrato.
      * @param cduser Identificador do usuário.
      * @param cdtemplate Identificador do modelo de notificação.
      * @param dtsend Data de envio.
      * @return true se a notificação já existe.
      */
-    public boolean jaExiste(int cdcontract, int cduser, int cdtemplate, java.time.LocalDate dtsend) {
-        String sql = "SELECT 1 FROM Notifications WHERE cdcontract = ? AND cduser = ? AND cdnotificationtemplate = ? AND dtsend = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, cdcontract);
-            ps.setInt(2, cduser);
-            ps.setInt(3, cdtemplate);
-            ps.setDate(4, Date.valueOf(dtsend));
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
+    public boolean jaExiste(int cdcontract, int cduser, int cdtemplate, LocalDate dtsend) {
+        try {
+            MongoCollection<Document> collection = Conexao.getCollection(COLLECTION_NAME);
+            Document found = collection.find(Filters.and(
+                Filters.eq("cdcontract", cdcontract),
+                Filters.eq("cduser", cduser),
+                Filters.eq("cdnotificationtemplate", cdtemplate),
+                Filters.eq("dtsend", dtsend != null ? dtsend.toString() : null)
+            )).first();
+            return found != null;
+        } catch (Exception e) {
             System.err.println("Erro ao verificar duplicata de notificação: " + e.getMessage());
             return false;
         }
@@ -121,19 +162,19 @@ public class NotificationDAO {
 
     /**
      * Busca o ID do modelo de notificação baseado no código do tipo de evento.
-     * 
+     * Consulta a coleção "notification_templates".
+     *
      * @param tpcode Código do tipo de evento.
      * @return ID do modelo ou -1 se não encontrado.
      */
     public int findTemplateIdByCode(int tpcode) {
-        String sql = "SELECT cdnotificationtemplate FROM Notification_Templates WHERE tpcode = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, tpcode);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) return rs.getInt(1);
+        try {
+            MongoCollection<Document> templates = Conexao.getCollection(TEMPLATES_COLLECTION);
+            Document doc = templates.find(Filters.eq("tpcode", tpcode)).first();
+            if (doc != null) {
+                return doc.getInteger("_id");
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao buscar template de notificação: " + e.getMessage());
         }
         return -1;
@@ -141,7 +182,7 @@ public class NotificationDAO {
 
     /**
      * Registra uma nova notificação caso ela ainda não exista para os mesmos parâmetros e data.
-     * 
+     *
      * @param cdcontract Identificador do contrato.
      * @param cduser Identificador do usuário.
      * @param tpcode Código do tipo de evento.
@@ -150,13 +191,13 @@ public class NotificationDAO {
      * @return true se a notificação foi criada com sucesso.
      */
     public boolean criarSeNaoExistir(int cdcontract, int cduser, int tpcode,
-                                      String mensagem, java.time.LocalDate dtsend) {
+                                      String mensagem, LocalDate dtsend) {
         return criarSeNaoExistir(cdcontract, cduser, tpcode, mensagem, dtsend, NotificationChannel.EMAIL);
     }
 
     /**
      * Registra uma nova notificação via canal específico caso ela ainda não exista.
-     * 
+     *
      * @param cdcontract Identificador do contrato.
      * @param cduser Identificador do usuário.
      * @param tpcode Código do tipo de evento.
@@ -166,7 +207,7 @@ public class NotificationDAO {
      * @return true se a notificação foi criada com sucesso.
      */
     public boolean criarSeNaoExistir(int cdcontract, int cduser, int tpcode,
-                                      String mensagem, java.time.LocalDate dtsend,
+                                      String mensagem, LocalDate dtsend,
                                       NotificationChannel channel) {
         int cdtemplate = findTemplateIdByCode(tpcode);
         if (cdtemplate < 0) {
@@ -187,24 +228,5 @@ public class NotificationDAO {
         n.setFgchannel(channel.getCode());
         insert(n);
         return true;
-    }
-
-    /**
-     * Mapeia um registro do ResultSet para um objeto Notifications.
-     * 
-     * @param rs ResultSet posicionado no registro.
-     * @return Objeto Notifications preenchido.
-     * @throws SQLException Caso ocorra erro no mapeamento.
-     */
-    private Notifications mapRow(ResultSet rs) throws SQLException {
-        Notifications n = new Notifications();
-        n.setCdnotification(rs.getInt("cdnotification"));
-        n.setDsmessage(rs.getString("dsmessage"));
-        if (rs.getDate("dtsend") != null) n.setDtsend(rs.getDate("dtsend").toLocalDate());
-        n.setCdcontract(rs.getInt("cdcontract"));
-        n.setCduser(rs.getInt("cduser"));
-        n.setCdnotificationtemplate(rs.getInt("cdnotificationtemplate"));
-        n.setFgchannel(rs.getInt("fgchannel"));
-        return n;
     }
 }

@@ -1,146 +1,250 @@
 package dao;
 
 import model.Topics;
-import java.sql.*;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import org.bson.Document;
+
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Gerencia as operações de persistência para os tópicos de contratos.
+ * Tópicos são documentos embarcados dentro da coleção "contract_templates".
  */
 public class TopicDAO {
 
+    private static final String COLLECTION_NAME = "contract_templates";
+
     /**
-     * Insere um novo tópico no banco de dados.
-     * 
+     * Obtém a coleção MongoDB de modelos de contrato.
+     */
+    private MongoCollection<Document> getCollection() {
+        return Conexao.getCollection(COLLECTION_NAME);
+    }
+
+    /**
+     * Converte um objeto Topics para Document BSON.
+     */
+    private Document toDocument(Topics t) {
+        Document doc = new Document();
+        doc.append("cdtopic", t.getCdtopic());
+        doc.append("nmtopic", t.getNmtopic());
+        doc.append("nrorder", t.getNrorder());
+        doc.append("clauses", new ArrayList<Document>());
+        return doc;
+    }
+
+    /**
+     * Converte um Document BSON para objeto Topics.
+     */
+    private Topics fromDocument(Document doc) {
+        Topics t = new Topics();
+        t.setCdtopic(doc.getInteger("cdtopic"));
+        t.setNmtopic(doc.getString("nmtopic"));
+        t.setNrorder(doc.getInteger("nrorder"));
+        return t;
+    }
+
+    /**
+     * Insere um novo tópico embarcado em um template.
+     * Gera ID sequencial via SequenceGenerator.
+     * Nota: requer que o template já exista. Insere no primeiro template se nenhum for especificado.
+     *
      * @param t Objeto contendo os dados do tópico.
      */
     public void insert(Topics t) {
-        String sql = "INSERT INTO Topics (nmtopic, nrorder) VALUES (?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, t.getNmtopic());
-            ps.setInt(2, t.getNrorder());
-            ps.executeUpdate();
-            try (ResultSet keys = ps.getGeneratedKeys()) {
-                if (keys.next()) t.setCdtopic(keys.getInt(1));
+        try {
+            int id = SequenceGenerator.getNextSequence("topics");
+            t.setCdtopic(id);
+            // Insere no primeiro template encontrado (para manter compatibilidade com o CRUD genérico)
+            Document template = getCollection().find().first();
+            if (template != null) {
+                getCollection().updateOne(
+                    Filters.eq("_id", template.getInteger("_id")),
+                    Updates.push("topics", toDocument(t))
+                );
+                System.out.println("Tópico inserido com sucesso! (ID: " + t.getCdtopic() + ")");
+            } else {
+                System.err.println("Nenhum template encontrado para inserir o tópico.");
             }
-            System.out.println("Tópico inserido com sucesso! (ID: " + t.getCdtopic() + ")");
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao inserir tópico: " + e.getMessage());
         }
     }
 
     /**
-     * Busca um tópico pelo seu identificador.
-     * 
+     * Insere um novo tópico embarcado em um template específico.
+     *
+     * @param t Objeto contendo os dados do tópico.
+     * @param templateId ID do template onde inserir o tópico.
+     */
+    public void insert(Topics t, int templateId) {
+        try {
+            int id = SequenceGenerator.getNextSequence("topics");
+            t.setCdtopic(id);
+            getCollection().updateOne(
+                Filters.eq("_id", templateId),
+                Updates.push("topics", toDocument(t))
+            );
+            System.out.println("Tópico inserido com sucesso! (ID: " + t.getCdtopic() + ")");
+        } catch (Exception e) {
+            System.err.println("Erro ao inserir tópico: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Busca um tópico pelo seu identificador, pesquisando em todos os templates.
+     *
      * @param id Identificador do tópico.
      * @return Objeto Topics ou null.
      */
+    @SuppressWarnings("unchecked")
     public Topics findById(int id) {
-        String sql = "SELECT * FROM Topics WHERE cdtopic = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    Topics t = new Topics();
-                    t.setCdtopic(rs.getInt("cdtopic"));
-                    t.setNmtopic(rs.getString("nmtopic"));
-                    t.setNrorder(rs.getInt("nrorder"));
-                    return t;
+        try (MongoCursor<Document> cursor = getCollection().find().iterator()) {
+            while (cursor.hasNext()) {
+                Document templateDoc = cursor.next();
+                List<Document> topics = (List<Document>) templateDoc.get("topics");
+                if (topics != null) {
+                    for (Document topicDoc : topics) {
+                        if (topicDoc.getInteger("cdtopic") == id) {
+                            return fromDocument(topicDoc);
+                        }
+                    }
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar tópico por ID: " + e.getMessage());
         }
         return null;
     }
 
     /**
-     * Lista todos os tópicos cadastrados, ordenados pela ordem definida.
-     * 
-     * @return Lista de objetos Topics.
+     * Busca os tópicos vinculados a um modelo de contrato (template).
+     * Extrai o array de tópicos do documento do template.
+     *
+     * @param templateId Identificador do modelo de contrato.
+     * @return Lista de tópicos vinculados, ordenados por nrorder.
      */
-    public List<Topics> listAll() {
+    @SuppressWarnings("unchecked")
+    public List<Topics> findByTemplateId(int templateId) {
         List<Topics> list = new ArrayList<>();
-        String sql = "SELECT * FROM Topics ORDER BY nrorder, cdtopic";
-        try (Connection conn = Conexao.getConexao();
-             Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery(sql)) {
-            while (rs.next()) {
-                Topics t = new Topics();
-                t.setCdtopic(rs.getInt("cdtopic"));
-                t.setNmtopic(rs.getString("nmtopic"));
-                t.setNrorder(rs.getInt("nrorder"));
-                list.add(t);
+        try {
+            Document templateDoc = getCollection().find(Filters.eq("_id", templateId)).first();
+            if (templateDoc != null) {
+                List<Document> topics = (List<Document>) templateDoc.get("topics");
+                if (topics != null) {
+                    for (Document topicDoc : topics) {
+                        list.add(fromDocument(topicDoc));
+                    }
+                    // Ordena por nrorder
+                    list.sort((a, b) -> Integer.compare(a.getNrorder(), b.getNrorder()));
+                }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar tópicos por template: " + e.getMessage());
         }
         return list;
     }
 
     /**
-     * Atualiza os dados de um tópico existente.
-     * 
+     * Lista todos os tópicos de todos os templates, ordenados pela ordem definida.
+     *
+     * @return Lista de objetos Topics.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Topics> listAll() {
+        List<Topics> list = new ArrayList<>();
+        try (MongoCursor<Document> cursor = getCollection().find().iterator()) {
+            while (cursor.hasNext()) {
+                Document templateDoc = cursor.next();
+                List<Document> topics = (List<Document>) templateDoc.get("topics");
+                if (topics != null) {
+                    for (Document topicDoc : topics) {
+                        list.add(fromDocument(topicDoc));
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao listar tópicos: " + e.getMessage());
+        }
+        list.sort((a, b) -> {
+            int cmp = Integer.compare(a.getNrorder(), b.getNrorder());
+            return cmp != 0 ? cmp : Integer.compare(a.getCdtopic(), b.getCdtopic());
+        });
+        return list;
+    }
+
+    /**
+     * Atualiza os dados de um tópico existente usando array filters positional operator.
+     *
      * @param t Objeto contendo os dados atualizados do tópico.
      */
+    @SuppressWarnings("unchecked")
     public void update(Topics t) {
-        String sql = "UPDATE Topics SET nmtopic=?, nrorder=? WHERE cdtopic=?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, t.getNmtopic()); 
-            ps.setInt(2, t.getNrorder());
-            ps.setInt(3, t.getCdtopic()); 
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        try {
+            // Encontra o template que contém esse tópico
+            try (MongoCursor<Document> cursor = getCollection().find().iterator()) {
+                while (cursor.hasNext()) {
+                    Document templateDoc = cursor.next();
+                    List<Document> topics = (List<Document>) templateDoc.get("topics");
+                    if (topics != null) {
+                        for (int i = 0; i < topics.size(); i++) {
+                            if (topics.get(i).getInteger("cdtopic") == t.getCdtopic()) {
+                                // Atualiza usando $set com dot notation posicional
+                                getCollection().updateOne(
+                                    Filters.and(
+                                        Filters.eq("_id", templateDoc.getInteger("_id")),
+                                        Filters.eq("topics.cdtopic", t.getCdtopic())
+                                    ),
+                                    Updates.combine(
+                                        Updates.set("topics.$.nmtopic", t.getNmtopic()),
+                                        Updates.set("topics.$.nrorder", t.getNrorder())
+                                    )
+                                );
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao atualizar tópico: " + e.getMessage());
         }
     }
 
     /**
-     * Exclui um tópico pelo seu identificador.
-     * 
+     * Exclui um tópico pelo seu identificador usando $pull no array de topics.
+     *
      * @param id Identificador do tópico.
      * @return true se excluído com sucesso.
      */
+    @SuppressWarnings("unchecked")
     public boolean delete(int id) {
-        String sql = "DELETE FROM Topics WHERE cdtopic = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, id);
-            return ps.executeUpdate() > 0;
-        } catch (SQLException e) {
-            System.err.println("Erro ao excluir tópico: " + e.getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Busca os tópicos vinculados a um modelo de contrato (Template).
-     * 
-     * @param templateId Identificador do modelo de contrato.
-     * @return Lista de tópicos vinculados.
-     */
-    public List<Topics> findByTemplateId(int templateId) {
-        List<Topics> list = new ArrayList<>();
-        String sql = "SELECT t.* FROM Topics t INNER JOIN Template_Topics tt ON t.cdtopic = tt.cdtopic WHERE tt.cdtemplate = ? ORDER BY t.nrorder";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, templateId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Topics t = new Topics();
-                    t.setCdtopic(rs.getInt("cdtopic"));
-                    t.setNmtopic(rs.getString("nmtopic"));
-                    t.setNrorder(rs.getInt("nrorder"));
-                    list.add(t);
+        try {
+            // Encontra o template que contém esse tópico e remove com $pull
+            try (MongoCursor<Document> cursor = getCollection().find().iterator()) {
+                while (cursor.hasNext()) {
+                    Document templateDoc = cursor.next();
+                    List<Document> topics = (List<Document>) templateDoc.get("topics");
+                    if (topics != null) {
+                        for (Document topicDoc : topics) {
+                            if (topicDoc.getInteger("cdtopic") == id) {
+                                getCollection().updateOne(
+                                    Filters.eq("_id", templateDoc.getInteger("_id")),
+                                    Updates.pull("topics", new Document("cdtopic", id))
+                                );
+                                return true;
+                            }
+                        }
+                    }
                 }
             }
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            System.err.println("Erro ao excluir tópico: " + e.getMessage());
         }
-        return list;
+        return false;
     }
 }

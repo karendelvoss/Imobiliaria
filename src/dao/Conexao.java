@@ -1,33 +1,65 @@
 package dao;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
+import com.mongodb.client.MongoClient;
+import com.mongodb.client.MongoClients;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import org.bson.Document;
 
 /**
- * Fornece conexões com o banco de dados PostgreSQL.
+ * Fornece conexão com o banco de dados MongoDB.
+ * Implementa padrão Singleton com sincronização.
  */
 public class Conexao {
 
-    private static final String URL = "jdbc:postgresql://localhost:5433/postgres";
-    private static final String USER = "postgres";
-    private static final String SENHA = "postgres";
+    private static final String HOST = "localhost";
+    private static final int PORT = 27017;
+    private static final String DATABASE = "imobiliaria";
+    private static final String CONNECTION_STRING = "mongodb://" + HOST + ":" + PORT;
+
+    private static MongoClient client;
 
     private Conexao() {}
 
     /**
-     * Obtém uma nova conexão com o banco de dados.
-     * 
-     * @return Connection estabelecida.
-     * @throws SQLException Caso ocorra erro na conexão.
+     * Obtém a instância única do MongoClient (Singleton sincronizado).
+     *
+     * @return MongoClient conectado ao servidor configurado.
      */
-    public static Connection getConexao() throws SQLException {
-        try {
-            Class.forName("org.postgresql.Driver");
-        } catch (ClassNotFoundException e) {
-            throw new SQLException("Driver PostgreSQL não encontrado!", e);
+    public static synchronized MongoClient getClient() {
+        if (client == null) {
+            client = MongoClients.create(CONNECTION_STRING);
         }
-        
-        return DriverManager.getConnection(URL, USER, SENHA);
+        return client;
+    }
+
+    /**
+     * Obtém o banco de dados configurado.
+     *
+     * @return MongoDatabase da aplicação.
+     */
+    public static MongoDatabase getDatabase() {
+        return getClient().getDatabase(DATABASE);
+    }
+
+    /**
+     * Obtém uma coleção pelo nome.
+     *
+     * @param name Nome da coleção.
+     * @return MongoCollection de Documents.
+     */
+    public static MongoCollection<Document> getCollection(String name) {
+        return getDatabase().getCollection(name);
+    }
+
+    /**
+     * Fecha a conexão com o MongoDB para shutdown gracioso.
+     * Após chamada, uma nova conexão será criada na próxima utilização.
+     */
+    public static synchronized void close() {
+        if (client != null) {
+            client.close();
+            client = null;
+        }
     }
 }

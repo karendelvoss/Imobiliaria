@@ -1,37 +1,68 @@
 package dao;
 
 import model.Installments;
-import java.sql.Connection;
-import java.sql.Date;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import model.InstallmentStatus;
+import dto.CashFlowReportDTO;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoCursor;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Updates;
+import com.mongodb.client.model.Aggregates;
+import com.mongodb.client.model.Accumulators;
+import com.mongodb.client.model.Sorts;
+import org.bson.Document;
+import org.bson.conversions.Bson;
+
+import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
  * Gerencia as operações de persistência para as parcelas (Installments).
+ *
+ * No modelo MongoDB, parcelas são documentos embarcados dentro do array
+ * {@code installments} na coleção {@code contracts}. Portanto, todas as
+ * operações desta classe operam sobre a coleção de contratos usando
+ * operadores de array, positional operators e aggregation pipelines.
  */
 public class InstallmentDAO {
 
+    private static final String COLLECTION_NAME = "contracts";
+
+    /**
+     * Obtém a coleção MongoDB de contratos (onde as parcelas estão embarcadas).
+     */
+    private MongoCollection<Document> getCollection() {
+        return Conexao.getCollection(COLLECTION_NAME);
+    }
+
+    // ========== Busca ==========
+
     /**
      * Busca uma parcela específica pelo seu identificador.
-     * 
+     * Usa aggregation pipeline com $unwind para localizar a parcela dentro de qualquer contrato.
+     *
      * @param installmentId Identificador da parcela.
      * @return Objeto Installments ou null.
      */
     public Installments findById(int installmentId) {
-        String sql = "SELECT * FROM Installments WHERE cdinstallment = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setInt(1, installmentId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapResultSetToInstallment(rs);
+        try {
+            List<Bson> pipeline = Arrays.asList(
+                Aggregates.unwind("$installments"),
+                Aggregates.match(Filters.eq("installments.cdinstallment", installmentId)),
+                Aggregates.limit(1)
+            );
+
+            try (MongoCursor<Document> cursor = getCollection().aggregate(pipeline).iterator()) {
+                if (cursor.hasNext()) {
+                    Document result = cursor.next();
+                    int cdcontract = result.getInteger("_id");
+                    Document instDoc = result.get("installments", Document.class);
+                    return ContractDAO.installmentFromDocument(instDoc, cdcontract);
                 }
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao buscar parcela por ID: " + e.getMessage());
         }
         return null;
@@ -39,123 +70,122 @@ public class InstallmentDAO {
 
     /**
      * Busca todas as parcelas associadas a um contrato.
-     * 
+     * Extrai o array {@code installments} do documento do contrato.
+     *
      * @param contractId Identificador do contrato.
      * @return Lista de objetos Installments.
      */
     public List<Installments> findByContractId(int contractId) {
         List<Installments> installments = new ArrayList<>();
-        String sql = "SELECT * FROM Installments WHERE cdcontract = ? ORDER BY nrinstallment";
-        
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setInt(1, contractId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    installments.add(mapResultSetToInstallment(rs));
+        try {
+            Document doc = getCollection().find(Filters.eq("_id", contractId)).first();
+            if (doc != null) {
+                List<Document> instDocs = doc.getList("installments", Document.class);
+                if (instDocs != null) {
+                    for (Document instDoc : instDocs) {
+                        installments.add(ContractDAO.installmentFromDocument(instDoc, contractId));
+                    }
                 }
+                // Ordenar por nrinstallment
+                installments.sort((a, b) -> Integer.compare(a.getNrinstallment(), b.getNrinstallment()));
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao buscar parcelas por contrato: " + e.getMessage());
         }
         return installments;
     }
 
+    // ========== Atualização ==========
+
     /**
      * Atualiza os dados de uma parcela existente.
-     * 
+     * Usa o positional operator ($) com elemMatch para atualizar a parcela específica
+     * dentro do array embarcado no contrato.
+     *
      * @param installment Objeto contendo os dados atualizados.
      */
     public void update(Installments installment) {
-        String sql = "UPDATE Installments SET dtdue = ?, vlbase = ?, vladjusted = ?, cdstatus = ?, dtpayment = ?, vlpenalty = ?, vlinterest = ? WHERE cdinstallment = ?";
-        
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setDate(1, Date.valueOf(installment.getDtdue()));
-            ps.setDouble(2, installment.getVlbase());
-            ps.setDouble(3, installment.getVladjusted());
-            ps.setInt(4, installment.getCdstatus());
-            ps.setDate(5, installment.getDtpayment() != null ? Date.valueOf(installment.getDtpayment()) : null);
-            ps.setDouble(6, installment.getVlpenalty());
-            ps.setDouble(7, installment.getVlinterest());
-            ps.setInt(8, installment.getCdinstallment());
-            
-            ps.executeUpdate();
-        } catch (SQLException e) {
+        try {
+            Bson filter = Filters.and(
+                Filters.eq("_id", installment.getFk_Contracts_cdcontract()),
+                Filters.elemMatch("installments",
+                    Filters.eq("cdinstallment", installment.getCdinstallment()))
+            );
+
+            Bson update = Updates.combine(
+                Updates.set("installments.$.dtdue", installment.getDtdue() != null ? installment.getDtdue().toString() : null),
+                Updates.set("installments.$.vlbase", installment.getVlbase()),
+                Updates.set("installments.$.vladjusted", installment.getVladjusted()),
+                Updates.set("installments.$.cdstatus", installment.getCdstatus()),
+                Updates.set("installments.$.dtpayment", installment.getDtpayment() != null ? installment.getDtpayment().toString() : null),
+                Updates.set("installments.$.vlpenalty", installment.getVlpenalty()),
+                Updates.set("installments.$.vlinterest", installment.getVlinterest()),
+                Updates.set("installments.$.dtlastadjustment", installment.getDtlastadjustment() != null ? installment.getDtlastadjustment().toString() : null)
+            );
+
+            getCollection().updateOne(filter, update);
+        } catch (Exception e) {
             System.err.println("Erro ao atualizar parcela: " + e.getMessage());
         }
     }
 
+    // ========== Inserção em Lote ==========
+
     /**
-     * Insere várias parcelas em lote.
-     * 
+     * Insere várias parcelas em lote dentro de um contrato existente.
+     * Usa $push com $each para adicionar múltiplas parcelas ao array embarcado.
+     *
+     * @param contractId Identificador do contrato.
      * @param installments Lista de parcelas a serem inseridas.
      */
-    public void insertBatch(List<Installments> installments) {
-        String sql = "INSERT INTO Installments (dtdue, vlbase, cdstatus, nrinstallment, cdcontract, vlpenalty, vlinterest) VALUES (?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+    public void insertBatch(int contractId, List<Installments> installments) {
+        try {
+            List<Document> instDocs = new ArrayList<>();
             for (Installments inst : installments) {
-                ps.setDate(1, Date.valueOf(inst.getDtdue()));
-                ps.setDouble(2, inst.getVlbase());
-                ps.setInt(3, inst.getCdstatus());
-                ps.setInt(4, inst.getNrinstallment());
-                ps.setInt(5, inst.getFk_Contracts_cdcontract());
-                ps.setDouble(6, inst.getVlpenalty());
-                ps.setDouble(7, inst.getVlinterest());
-                ps.addBatch();
+                if (inst.getCdinstallment() <= 0) {
+                    inst.setCdinstallment(SequenceGenerator.getNextSequence("installments"));
+                }
+                inst.setFk_Contracts_cdcontract(contractId);
+                instDocs.add(ContractDAO.installmentToDocument(inst));
             }
-            ps.executeBatch();
-        } catch (SQLException e) {
+
+            Bson filter = Filters.eq("_id", contractId);
+            Bson update = Updates.pushEach("installments", instDocs);
+
+            getCollection().updateOne(filter, update);
+        } catch (Exception e) {
             System.err.println("Erro ao inserir parcelas: " + e.getMessage());
         }
     }
 
-    /**
-     * Mapeia um registro do ResultSet para um objeto Installments.
-     * 
-     * @param rs ResultSet posicionado no registro.
-     * @return Objeto Installments preenchido.
-     * @throws SQLException Caso ocorra erro no mapeamento.
-     */
-    private Installments mapResultSetToInstallment(ResultSet rs) throws SQLException {
-        Installments inst = new Installments();
-        inst.setCdinstallment(rs.getInt("cdinstallment"));
-        inst.setDtdue(rs.getDate("dtdue").toLocalDate());
-        inst.setVlbase(rs.getDouble("vlbase"));
-        inst.setVladjusted(rs.getDouble("vladjusted"));
-        inst.setCdstatus(rs.getInt("cdstatus"));
-        inst.setDtpayment(rs.getDate("dtpayment") != null ? rs.getDate("dtpayment").toLocalDate() : null);
-        inst.setNrinstallment(rs.getInt("nrinstallment"));
-        inst.setFk_Contracts_cdcontract(rs.getInt("cdcontract"));
-        inst.setVlpenalty(rs.getDouble("vlpenalty"));
-        inst.setVlinterest(rs.getDouble("vlinterest"));
-        return inst;
-    }
+    // ========== Consultas de Parcelas Pendentes ==========
 
     /**
      * Busca a última parcela com status pendente de um contrato.
-     * 
+     * Filtra pelo contrato, extrai as parcelas pendentes e retorna a de maior nrinstallment.
+     *
      * @param contractId Identificador do contrato.
      * @return Objeto Installments ou null.
      */
     public Installments findLastPendingInstallmentByContractId(int contractId) {
-        String sql = "SELECT * FROM Installments " +
-                     "WHERE cdcontract = ? AND cdstatus = 1 " +
-                     "ORDER BY nrinstallment DESC LIMIT 1";
-        
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setInt(1, contractId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapResultSetToInstallment(rs);
+        try {
+            Document doc = getCollection().find(Filters.eq("_id", contractId)).first();
+            if (doc != null) {
+                List<Document> instDocs = doc.getList("installments", Document.class);
+                if (instDocs != null) {
+                    Installments last = null;
+                    for (Document instDoc : instDocs) {
+                        if (instDoc.getInteger("cdstatus", 0) == InstallmentStatus.PENDENTE.getCode()) {
+                            Installments inst = ContractDAO.installmentFromDocument(instDoc, contractId);
+                            if (last == null || inst.getNrinstallment() > last.getNrinstallment()) {
+                                last = inst;
+                            }
+                        }
+                    }
+                    return last;
                 }
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao buscar última parcela pendente: " + e.getMessage());
         }
         return null;
@@ -163,47 +193,61 @@ public class InstallmentDAO {
 
     /**
      * Busca todas as parcelas pendentes de um contrato.
-     * 
+     *
      * @param contractId Identificador do contrato.
-     * @return Lista de parcelas pendentes.
+     * @return Lista de parcelas pendentes ordenadas por nrinstallment.
      */
     public List<Installments> findPendingInstallmentsByContractId(int contractId) {
-        List<Installments> installments = new ArrayList<>();
-        String sql = "SELECT * FROM Installments WHERE cdcontract = ? AND cdstatus = 1 ORDER BY nrinstallment";
-        
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setInt(1, contractId);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    installments.add(mapResultSetToInstallment(rs));
+        List<Installments> result = new ArrayList<>();
+        try {
+            Document doc = getCollection().find(Filters.eq("_id", contractId)).first();
+            if (doc != null) {
+                List<Document> instDocs = doc.getList("installments", Document.class);
+                if (instDocs != null) {
+                    for (Document instDoc : instDocs) {
+                        if (instDoc.getInteger("cdstatus", 0) == InstallmentStatus.PENDENTE.getCode()) {
+                            result.add(ContractDAO.installmentFromDocument(instDoc, contractId));
+                        }
+                    }
+                    result.sort((a, b) -> Integer.compare(a.getNrinstallment(), b.getNrinstallment()));
                 }
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao buscar parcelas pendentes: " + e.getMessage());
         }
-        return installments;
+        return result;
     }
+
+    // ========== Consultas com Aggregation Pipeline ==========
 
     /**
      * Busca parcelas por data de vencimento e status.
-     * 
+     * Usa aggregation pipeline com $unwind para buscar parcelas em todos os contratos.
+     *
      * @param dtdue Data de vencimento.
      * @param cdstatus Código do status.
      * @return Lista de parcelas encontradas.
      */
-    public List<Installments> findByDueDateAndStatus(java.time.LocalDate dtdue, int cdstatus) {
+    public List<Installments> findByDueDateAndStatus(LocalDate dtdue, int cdstatus) {
         List<Installments> result = new ArrayList<>();
-        String sql = "SELECT * FROM Installments WHERE dtdue = ? AND cdstatus = ?";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDate(1, Date.valueOf(dtdue));
-            ps.setInt(2, cdstatus);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) result.add(mapResultSetToInstallment(rs));
+        try {
+            List<Bson> pipeline = Arrays.asList(
+                Aggregates.unwind("$installments"),
+                Aggregates.match(Filters.and(
+                    Filters.eq("installments.dtdue", dtdue.toString()),
+                    Filters.eq("installments.cdstatus", cdstatus)
+                ))
+            );
+
+            try (MongoCursor<Document> cursor = getCollection().aggregate(pipeline).iterator()) {
+                while (cursor.hasNext()) {
+                    Document doc = cursor.next();
+                    int cdcontract = doc.getInteger("_id");
+                    Document instDoc = doc.get("installments", Document.class);
+                    result.add(ContractDAO.installmentFromDocument(instDoc, cdcontract));
+                }
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao buscar parcelas por vencimento: " + e.getMessage());
         }
         return result;
@@ -211,68 +255,148 @@ public class InstallmentDAO {
 
     /**
      * Busca parcelas que foram pagas em uma determinada data.
-     * 
+     * Usa aggregation pipeline com $unwind para buscar em todos os contratos.
+     *
      * @param dtpayment Data de pagamento.
-     * @return Lista de parcelas pagas.
+     * @return Lista de parcelas pagas nesta data.
      */
-    public List<Installments> findByPaymentDate(java.time.LocalDate dtpayment) {
+    public List<Installments> findByPaymentDate(LocalDate dtpayment) {
         List<Installments> result = new ArrayList<>();
-        String sql = "SELECT * FROM Installments WHERE dtpayment = ? AND cdstatus = 2";
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDate(1, Date.valueOf(dtpayment));
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) result.add(mapResultSetToInstallment(rs));
+        try {
+            List<Bson> pipeline = Arrays.asList(
+                Aggregates.unwind("$installments"),
+                Aggregates.match(Filters.and(
+                    Filters.eq("installments.dtpayment", dtpayment.toString()),
+                    Filters.eq("installments.cdstatus", InstallmentStatus.PAGO.getCode())
+                ))
+            );
+
+            try (MongoCursor<Document> cursor = getCollection().aggregate(pipeline).iterator()) {
+                while (cursor.hasNext()) {
+                    Document doc = cursor.next();
+                    int cdcontract = doc.getInteger("_id");
+                    Document instDoc = doc.get("installments", Document.class);
+                    result.add(ContractDAO.installmentFromDocument(instDoc, cdcontract));
+                }
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao buscar parcelas pagas por data: " + e.getMessage());
         }
         return result;
     }
 
+    // ========== Relatório de Fluxo de Caixa ==========
+
     /**
      * Gera o relatório de fluxo de caixa mensal para um ano e contrato específicos.
-     * 
+     * Usa aggregation pipeline: $match contratos ativos → $unwind installments →
+     * $match por ano → $group por mês com somas condicionais.
+     *
      * @param year Ano de referência.
      * @param contractId Identificador do contrato (0 para todos).
      * @return Lista de DTOs do relatório.
      */
-    public List<dto.CashFlowReportDTO> getMonthlyCashFlowReport(int year, int contractId) {
-        List<dto.CashFlowReportDTO> report = new ArrayList<>();
-        String sql = "SELECT " +
-                     "  EXTRACT(MONTH FROM dtdue) AS mes, " +
-                     "  EXTRACT(YEAR FROM dtdue) AS ano, " +
-                     "  SUM(CASE WHEN cdstatus = 2 THEN COALESCE(vladjusted, vlbase) ELSE 0 END) AS recebido, " +
-                     "  SUM(CASE WHEN cdstatus = 1 THEN COALESCE(vladjusted, vlbase) ELSE 0 END) AS pendente, " +
-                     "  SUM(CASE WHEN cdstatus = 1 AND dtdue < CURRENT_DATE THEN COALESCE(vladjusted, vlbase) ELSE 0 END) AS em_atraso " +
-                     "FROM Installments " +
-                     "WHERE EXTRACT(YEAR FROM dtdue) = ? " +
-                     (contractId > 0 ? "AND cdcontract = ? " : "") +
-                     "GROUP BY ano, mes " +
-                     "ORDER BY mes";
+    public List<CashFlowReportDTO> getMonthlyCashFlowReport(int year, int contractId) {
+        List<CashFlowReportDTO> report = new ArrayList<>();
+        try {
+            String yearStr = String.valueOf(year);
 
-        try (Connection conn = Conexao.getConexao();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
-            ps.setInt(1, year);
+            // Construir filtro inicial (por contrato ou todos os ativos)
+            List<Bson> pipeline = new ArrayList<>();
             if (contractId > 0) {
-                ps.setInt(2, contractId);
+                pipeline.add(Aggregates.match(Filters.eq("_id", contractId)));
             }
-            
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    dto.CashFlowReportDTO dto = new dto.CashFlowReportDTO();
-                    dto.setMes(rs.getInt("mes"));
-                    dto.setAno(rs.getInt("ano"));
-                    dto.setValorRecebido(rs.getDouble("recebido"));
-                    dto.setValorPendente(rs.getDouble("pendente"));
-                    dto.setValorEmAtraso(rs.getDouble("em_atraso"));
+
+            // Unwind parcelas
+            pipeline.add(Aggregates.unwind("$installments"));
+
+            // Filtrar parcelas do ano desejado (dtdue começa com o ano)
+            pipeline.add(Aggregates.match(
+                Filters.regex("installments.dtdue", "^" + yearStr)
+            ));
+
+            // Projetar campos necessários para o agrupamento
+            pipeline.add(Aggregates.project(new Document()
+                .append("installments", 1)
+                .append("month", new Document("$substr", Arrays.asList("$installments.dtdue", 5, 2)))
+            ));
+
+            // Agrupar por mês
+            pipeline.add(Aggregates.group("$month",
+                Accumulators.sum("recebido",
+                    new Document("$cond", Arrays.asList(
+                        new Document("$eq", Arrays.asList("$installments.cdstatus", InstallmentStatus.PAGO.getCode())),
+                        new Document("$cond", Arrays.asList(
+                            new Document("$gt", Arrays.asList("$installments.vladjusted", 0)),
+                            "$installments.vladjusted",
+                            "$installments.vlbase"
+                        )),
+                        0
+                    ))
+                ),
+                Accumulators.sum("pendente",
+                    new Document("$cond", Arrays.asList(
+                        new Document("$eq", Arrays.asList("$installments.cdstatus", InstallmentStatus.PENDENTE.getCode())),
+                        new Document("$cond", Arrays.asList(
+                            new Document("$gt", Arrays.asList("$installments.vladjusted", 0)),
+                            "$installments.vladjusted",
+                            "$installments.vlbase"
+                        )),
+                        0
+                    ))
+                ),
+                Accumulators.sum("emAtraso",
+                    new Document("$cond", Arrays.asList(
+                        new Document("$and", Arrays.asList(
+                            new Document("$eq", Arrays.asList("$installments.cdstatus", InstallmentStatus.PENDENTE.getCode())),
+                            new Document("$lt", Arrays.asList("$installments.dtdue", LocalDate.now().toString()))
+                        )),
+                        new Document("$cond", Arrays.asList(
+                            new Document("$gt", Arrays.asList("$installments.vladjusted", 0)),
+                            "$installments.vladjusted",
+                            "$installments.vlbase"
+                        )),
+                        0
+                    ))
+                )
+            ));
+
+            // Ordenar por mês
+            pipeline.add(Aggregates.sort(Sorts.ascending("_id")));
+
+            try (MongoCursor<Document> cursor = getCollection().aggregate(pipeline).iterator()) {
+                while (cursor.hasNext()) {
+                    Document doc = cursor.next();
+                    CashFlowReportDTO dto = new CashFlowReportDTO();
+                    String monthStr = doc.getString("_id");
+                    dto.setMes(Integer.parseInt(monthStr));
+                    dto.setAno(year);
+                    dto.setValorRecebido(getDoubleValue(doc, "recebido"));
+                    dto.setValorPendente(getDoubleValue(doc, "pendente"));
+                    dto.setValorEmAtraso(getDoubleValue(doc, "emAtraso"));
                     report.add(dto);
                 }
             }
-        } catch (SQLException e) {
+        } catch (Exception e) {
             System.err.println("Erro ao gerar relatório de fluxo de caixa: " + e.getMessage());
         }
         return report;
+    }
+
+    // ========== Métodos Auxiliares ==========
+
+    /**
+     * Extrai valor double de um Document de forma segura, tratando Integer e Double.
+     */
+    private double getDoubleValue(Document doc, String field) {
+        Object value = doc.get(field);
+        if (value instanceof Double) {
+            return (Double) value;
+        } else if (value instanceof Integer) {
+            return ((Integer) value).doubleValue();
+        } else if (value instanceof Long) {
+            return ((Long) value).doubleValue();
+        }
+        return 0.0;
     }
 }

@@ -325,7 +325,7 @@ public class ContractView {
 
         service.ContractPdfService pdfService = new service.ContractPdfService(
             templateDAO, topicDAO, clauseDAO, contractDAO, propertyDAO, userDAO, userContractDAO,
-            addressDAO, districtDAO, cityDAO, installmentDAO, bankAccountDAO, indexDAO, notaryDAO, occupationDAO
+            addressDAO, installmentDAO, bankAccountDAO, indexDAO, notaryDAO, occupationDAO
         );
         pdfService.generateContractPdf(cdcontract);
     }
@@ -361,7 +361,7 @@ public class ContractView {
             inst.setVlinterest(juros);
             parcelas.add(inst);
         }
-        installmentDAO.insertBatch(parcelas);
+        installmentDAO.insertBatch(contract.getCdcontract(), parcelas);
     }
 
     private int selecionarOuCriarUsuario(List<Integer> idsIgnorar) {

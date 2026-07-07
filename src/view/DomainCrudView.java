@@ -441,7 +441,7 @@ public class DomainCrudView {
         if (idTemplate > 0) {
             service.ContractPdfService pdfService = new service.ContractPdfService(
                 templateDAO, topicDAO, clauseDAO, contractDAO, new dao.PropertyDAO(), userDAO, userContractDAO,
-                addressDAO, districtDAO, cityDAO, installmentDAO, bankAccountDAO, indexDAO, notaryDAO, occupationDAO
+                addressDAO, installmentDAO, bankAccountDAO, indexDAO, notaryDAO, occupationDAO
             );
             pdfService.generateTemplatePdf(idTemplate);
         }
