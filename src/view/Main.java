@@ -13,16 +13,14 @@ public class Main {
     private final ContractView contractView;
     private final DomainCrudView domainView;
     private final ReportView reportView;
-    private final OccupationView occupationView;
 
     public Main(UserView userView, PropertyView propertyView, ContractView contractView,
-                DomainCrudView domainView, ReportView reportView, OccupationView occupationView) {
+                DomainCrudView domainView, ReportView reportView) {
         this.userView = userView;
         this.propertyView = propertyView;
         this.contractView = contractView;
         this.domainView = domainView;
         this.reportView = reportView;
-        this.occupationView = occupationView;
     }
 
     /**
@@ -61,8 +59,7 @@ public class Main {
                 pv,
                 new ContractView(contractDAO, propertyDAO, userDAO, templateDAO, indexDAO, topicDAO, uv, pv, installmentDAO, new BankAccountDAO(), new UserContractDAO(), addressDAO, new DistrictDAO(), new CityDAO(), new ClauseDAO(), new NotaryDAO(), occupationDAO),
                 domainView,
-                new ReportView(propertyDAO, new ReportService()),
-                new OccupationView(occupationDAO));
+                new ReportView(propertyDAO, new ReportService()));
 
         app.executar();
     }
@@ -101,28 +98,17 @@ public class Main {
             System.out.println("\n--- GESTÃO DE CADASTROS (CRUD) ---");
             System.out.println("1. Usuários");
             System.out.println("2. Imóveis");
-            System.out.println("3. Localização (Países, Estados, Cidades, Bairros, Endereços)");
-            System.out.println("4. Domínios de Imóveis (Tipos, Finalidades, Status)");
-            System.out.println("5. Domínios Contratuais (Modelos, Cláusulas, Índices, Papéis)");
-            System.out.println("6. Outros (Profissões, Contas Bancárias, Notificações)");
+            System.out.println("3. Modelos de Contrato (Templates, Tópicos, Cláusulas)");
+            System.out.println("4. Índices Financeiros (IPCA, etc.)");
+            System.out.println("5. Contas Bancárias");
             System.out.println("0. Voltar ao Menu Principal");
             op = ConsoleIO.lerIntSeguro("Escolha: ");
             switch (op) {
                 case 1: userView.menu(); break;
                 case 2: propertyView.menu(); break;
-                case 3: domainView.menuLocalizacao(); break;
-                case 4: domainView.menuAtributosImoveis(); break;
-                case 5: domainView.menuAtributosContratuais(); break;
-                case 6:
-                    System.out.println("\n--- 6. OUTROS DOMÍNIOS ---");
-                    System.out.println("1. Profissões");
-                    System.out.println("2. Contas Bancárias");
-                    System.out.println("3. Notificações");
-                    int subOp = ConsoleIO.lerIntSeguro("Escolha: ");
-                    if (subOp == 1) occupationView.menu();
-                    else if (subOp == 2) domainView.crudBankAccount();
-                    else if (subOp == 3) domainView.crudNotification();
-                    break;
+                case 3: domainView.menuAtributosContratuais(); break;
+                case 4: domainView.menuIndices(); break;
+                case 5: domainView.crudBankAccount(); break;
                 case 0: break;
                 default: System.out.println("Opção inválida!");
             }

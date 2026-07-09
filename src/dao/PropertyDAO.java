@@ -44,22 +44,19 @@ public class PropertyDAO {
      *
      * @param prop Objeto do modelo.
      * @param address Objeto de endereço para embarcar (pode ser null).
-     * @param typeName Nome do tipo de imóvel.
-     * @param purposeName Nome da finalidade.
-     * @param statusName Nome do status.
      * @param owners Lista de IDs dos proprietários.
      * @return Document BSON correspondente.
      */
-    public static Document toDocument(Properties prop, Addresses address, String typeName, String purposeName, String statusName, List<Integer> owners) {
+    public static Document toDocument(Properties prop, Addresses address, List<Integer> owners) {
         Document doc = new Document();
         doc.append("_id", prop.getCdproperty());
         doc.append("nrregistration", prop.getNrregistration());
         doc.append("dsdescription", prop.getDsdescription());
         doc.append("vltotalarea", prop.getVltotalarea());
         doc.append("address", AddressDAO.toDocument(address));
-        doc.append("type", typeName);
-        doc.append("purpose", purposeName);
-        doc.append("status", statusName);
+        doc.append("type", prop.getCdtype());
+        doc.append("purpose", prop.getCdpurpose());
+        doc.append("status", prop.getCdstatus());
         doc.append("owners", owners != null ? owners : new ArrayList<>());
         return doc;
     }
@@ -80,11 +77,54 @@ public class PropertyDAO {
         p.setVltotalarea(doc.getDouble("vltotalarea") != null ? doc.getDouble("vltotalarea") : 0.0);
         // cdaddress stores the property's own _id (address is embedded)
         p.setCdaddress(doc.getInteger("_id"));
-        // cdtype, cdpurpose, cdstatus are no longer FKs; set to 0 as placeholder
-        p.setCdtype(0);
-        p.setCdpurpose(0);
-        p.setCdstatus(0);
+        p.setCdtype(doc.getString("type"));
+        p.setCdpurpose(doc.getString("purpose"));
+        p.setCdstatus(doc.getString("status"));
         return p;
+    }
+
+    /**
+     * Insere um novo imóvel com endereço fornecido diretamente.
+     *
+     * @param prop Objeto contendo os dados do imóvel.
+     * @param address Objeto de endereço para embarcar.
+     * @return O ID gerado para o imóvel ou -1 em caso de erro.
+     */
+    public int insertPropertyWithAddress(Properties prop, Addresses address) {
+        try {
+            int newId = SequenceGenerator.getNextSequence(COLLECTION_NAME);
+            prop.setCdproperty(newId);
+
+            Document doc = toDocument(prop, address, new ArrayList<>());
+            getCollection().insertOne(doc);
+            System.out.println("Imóvel cadastrado com sucesso! (ID: " + newId + ")");
+            return newId;
+        } catch (com.mongodb.MongoWriteException e) {
+            if (e.getMessage() != null && e.getMessage().contains("duplicate key")) {
+                System.err.println("ERRO: Já existe um imóvel cadastrado com esta matrícula.");
+            } else {
+                System.err.println("Erro ao cadastrar imóvel: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao cadastrar imóvel: " + e.getMessage());
+        }
+        return -1;
+    }
+
+    /**
+     * Atualiza apenas o endereço embarcado de um imóvel.
+     *
+     * @param propertyId ID do imóvel.
+     * @param address Novo endereço.
+     */
+    public void updateAddress(int propertyId, Addresses address) {
+        try {
+            getCollection().updateOne(
+                    Filters.eq("_id", propertyId),
+                    Updates.set("address", AddressDAO.toDocument(address)));
+        } catch (Exception e) {
+            System.err.println("Erro ao atualizar endereço do imóvel: " + e.getMessage());
+        }
     }
 
     /**
@@ -105,12 +145,7 @@ public class PropertyDAO {
                 address = addressDAO.findById(prop.getCdaddress());
             }
 
-            // Buscar nomes de tipo/finalidade/status
-            String typeName = resolveTypeName(prop.getCdtype());
-            String purposeName = resolvePurposeName(prop.getCdpurpose());
-            String statusName = resolveStatusName(prop.getCdstatus());
-
-            Document doc = toDocument(prop, address, typeName, purposeName, statusName, new ArrayList<>());
+            Document doc = toDocument(prop, address, new ArrayList<>());
             getCollection().insertOne(doc);
             System.out.println("Imóvel cadastrado com sucesso! (ID: " + newId + ")");
             return newId;
@@ -210,18 +245,13 @@ public class PropertyDAO {
      */
     public void updateProperty(Properties prop) {
         try {
-            // Buscar nomes de tipo/finalidade/status
-            String typeName = resolveTypeName(prop.getCdtype());
-            String purposeName = resolvePurposeName(prop.getCdpurpose());
-            String statusName = resolveStatusName(prop.getCdstatus());
-
             List<Bson> updates = new ArrayList<>();
             updates.add(Updates.set("nrregistration", prop.getNrregistration()));
             updates.add(Updates.set("dsdescription", prop.getDsdescription()));
             updates.add(Updates.set("vltotalarea", prop.getVltotalarea()));
-            updates.add(Updates.set("type", typeName));
-            updates.add(Updates.set("purpose", purposeName));
-            updates.add(Updates.set("status", statusName));
+            updates.add(Updates.set("type", prop.getCdtype()));
+            updates.add(Updates.set("purpose", prop.getCdpurpose()));
+            updates.add(Updates.set("status", prop.getCdstatus()));
 
             getCollection().updateOne(
                 Filters.eq("_id", prop.getCdproperty()),
@@ -572,7 +602,55 @@ public class PropertyDAO {
         relatorioCompletoImoveis(null);
     }
 
-    // ----- Métodos auxiliares para resolver nomes de tipo/finalidade/status -----
+    /**
+     * Busca o endereço embarcado de um imóvel pelo ID.
+     *
+     * @param propertyId Identificador do imóvel.
+     * @return Objeto Addresses ou null.
+     */
+    public Addresses findAddressByPropertyId(int propertyId) {
+        try {
+            Document doc = getCollection().find(Filters.eq("_id", propertyId)).first();
+            if (doc != null) {
+                Document addressDoc = doc.get("address", Document.class);
+                if (addressDoc != null) {
+                    return AddressDAO.fromDocument(addressDoc);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar endereço do imóvel: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Lista todos os imóveis de forma formatada (ID, Matrícula, Tipo, Status, Endereço).
+     *
+     * @return Lista de Strings formatadas.
+     */
+    public List<String> listAllFormatted() {
+        List<String> list = new ArrayList<>();
+        try (MongoCursor<Document> cursor = getCollection()
+                .find()
+                .sort(new Document("_id", 1))
+                .iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                Document addrDoc = doc.get("address", Document.class);
+                String endereco = (addrDoc != null)
+                        ? addrDoc.getString("nmstreet") + ", " + addrDoc.getString("nraddress")
+                        : "sem endereço";
+                list.add("ID: " + doc.getInteger("_id") +
+                         " | Matrícula: " + doc.getString("nrregistration") +
+                         " | Tipo: " + (doc.getString("type") != null ? doc.getString("type") : "N/A") +
+                         " | Status: " + (doc.getString("status") != null ? doc.getString("status") : "N/A") +
+                         " | Endereço: " + endereco);
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao listar imóveis formatados: " + e.getMessage());
+        }
+        return list;
+    }
 
     // Mapeamento legado ID → texto (baseado nos dados originais do insert.sql)
     private static final java.util.Map<Integer, String> TYPE_MAP = java.util.Map.of(

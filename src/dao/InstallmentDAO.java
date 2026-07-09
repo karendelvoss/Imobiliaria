@@ -285,6 +285,40 @@ public class InstallmentDAO {
         return result;
     }
 
+    /**
+     * Busca parcelas por mês e ano de vencimento.
+     * Usa aggregation pipeline com $unwind para buscar em todos os contratos.
+     *
+     * @param mes Mês (1-12).
+     * @param ano Ano.
+     * @return Lista de parcelas com vencimento no mês/ano especificados.
+     */
+    public List<Installments> findByMonth(int mes, int ano) {
+        List<Installments> list = new ArrayList<>();
+        try {
+            String monthPrefix = String.format("%d-%02d", ano, mes);
+            List<Bson> pipeline = Arrays.asList(
+                Aggregates.unwind("$installments"),
+                Aggregates.match(Filters.regex("installments.dtdue", "^" + monthPrefix))
+            );
+
+            try (MongoCursor<Document> cursor = getCollection().aggregate(pipeline).iterator()) {
+                while (cursor.hasNext()) {
+                    Document doc = cursor.next();
+                    int cdcontract = doc.getInteger("_id");
+                    Document instDoc = doc.get("installments", Document.class);
+                    Installments inst = ContractDAO.installmentFromDocument(instDoc, cdcontract);
+                    if (inst != null) {
+                        list.add(inst);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar parcelas por mês: " + e.getMessage());
+        }
+        return list;
+    }
+
     // ========== Relatório de Fluxo de Caixa ==========
 
     /**

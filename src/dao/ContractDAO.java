@@ -146,21 +146,33 @@ public class ContractDAO {
         if (dtdue != null && !dtdue.isEmpty()) {
             inst.setDtdue(LocalDate.parse(dtdue));
         }
-        inst.setVlbase(doc.getDouble("vlbase") != null ? doc.getDouble("vlbase") : 0.0);
-        inst.setVladjusted(doc.getDouble("vladjusted") != null ? doc.getDouble("vladjusted") : 0.0);
+        inst.setVlbase(getDoubleValue(doc, "vlbase"));
+        inst.setVladjusted(getDoubleValue(doc, "vladjusted"));
         inst.setCdstatus(doc.getInteger("cdstatus", 0));
         String dtpayment = doc.getString("dtpayment");
         if (dtpayment != null && !dtpayment.isEmpty()) {
             inst.setDtpayment(LocalDate.parse(dtpayment));
         }
-        inst.setVlpenalty(doc.getDouble("vlpenalty") != null ? doc.getDouble("vlpenalty") : 0.0);
-        inst.setVlinterest(doc.getDouble("vlinterest") != null ? doc.getDouble("vlinterest") : 0.0);
+        inst.setVlpenalty(getDoubleValue(doc, "vlpenalty"));
+        inst.setVlinterest(getDoubleValue(doc, "vlinterest"));
         String dtlastadjustment = doc.getString("dtlastadjustment");
         if (dtlastadjustment != null && !dtlastadjustment.isEmpty()) {
             inst.setDtlastadjustment(LocalDate.parse(dtlastadjustment));
         }
         inst.setFk_Contracts_cdcontract(cdcontract);
         return inst;
+    }
+
+    /**
+     * Extrai valor double de um Document de forma segura, tratando Integer, Double e Long.
+     */
+    private static double getDoubleValue(Document doc, String field) {
+        Object value = doc.get(field);
+        if (value == null) return 0.0;
+        if (value instanceof Double) return (Double) value;
+        if (value instanceof Integer) return ((Integer) value).doubleValue();
+        if (value instanceof Long) return ((Long) value).doubleValue();
+        return 0.0;
     }
 
     // ========== Operações CRUD ==========
@@ -555,7 +567,168 @@ public class ContractDAO {
         return false;
     }
 
-    // ========== Métodos auxiliares ==========
+    /**
+     * Busca todos os participantes embarcados de um contrato.
+     *
+     * @param contractId Identificador do contrato.
+     * @return Lista de User_Contract.
+     */
+    public List<User_Contract> getParticipants(int contractId) {
+        List<User_Contract> participants = new ArrayList<>();
+        try {
+            Document doc = getCollection().find(Filters.eq("_id", contractId)).first();
+            if (doc != null) {
+                List<Document> participantDocs = doc.getList("participants", Document.class);
+                if (participantDocs != null) {
+                    for (Document pDoc : participantDocs) {
+                        User_Contract uc = new User_Contract();
+                        uc.setCduser(pDoc.getInteger("cduser", 0));
+                        uc.setCdrole(pDoc.getInteger("cdrole", 0));
+                        uc.setCdcontract(contractId);
+                        participants.add(uc);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar participantes: " + e.getMessage());
+        }
+        return participants;
+    }
+
+    /**
+     * Adiciona um participante ao array embarcado de um contrato.
+     *
+     * @param contractId Identificador do contrato.
+     * @param participant Participante a adicionar.
+     */
+    public void addParticipant(int contractId, User_Contract participant) {
+        try {
+            Document pDoc = new Document();
+            pDoc.append("cduser", participant.getCduser());
+            pDoc.append("cdrole", participant.getCdrole());
+            pDoc.append("nmrole", resolveRoleName(participant.getCdrole()));
+
+            getCollection().updateOne(
+                    Filters.eq("_id", contractId),
+                    Updates.push("participants", pDoc));
+            System.out.println("Participante adicionado ao contrato!");
+        } catch (Exception e) {
+            System.err.println("Erro ao adicionar participante: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Remove um participante do array embarcado de um contrato.
+     *
+     * @param contractId Identificador do contrato.
+     * @param userId ID do usuário a remover.
+     */
+    public void removeParticipant(int contractId, int userId) {
+        try {
+            getCollection().updateOne(
+                    Filters.eq("_id", contractId),
+                    Updates.pull("participants", new Document("cduser", userId)));
+            System.out.println("Participante removido do contrato!");
+        } catch (Exception e) {
+            System.err.println("Erro ao remover participante: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Busca todas as parcelas embarcadas de um contrato.
+     *
+     * @param contractId Identificador do contrato.
+     * @return Lista de Installments ordenada por nrinstallment.
+     */
+    public List<Installments> getInstallments(int contractId) {
+        List<Installments> installments = new ArrayList<>();
+        try {
+            Document doc = getCollection().find(Filters.eq("_id", contractId)).first();
+            if (doc != null) {
+                List<Document> instDocs = doc.getList("installments", Document.class);
+                if (instDocs != null) {
+                    for (Document instDoc : instDocs) {
+                        Installments inst = installmentFromDocument(instDoc, contractId);
+                        if (inst != null) {
+                            installments.add(inst);
+                        }
+                    }
+                    installments.sort((a, b) -> Integer.compare(a.getNrinstallment(), b.getNrinstallment()));
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar parcelas: " + e.getMessage());
+        }
+        return installments;
+    }
+
+    /**
+     * Adiciona múltiplas parcelas ao array embarcado de um contrato.
+     *
+     * @param contractId Identificador do contrato.
+     * @param installments Lista de parcelas a adicionar.
+     */
+    public void addInstallments(int contractId, List<Installments> installments) {
+        try {
+            List<Document> instDocs = new ArrayList<>();
+            for (Installments inst : installments) {
+                if (inst.getCdinstallment() <= 0) {
+                    inst.setCdinstallment(SequenceGenerator.getNextSequence("installments"));
+                }
+                inst.setFk_Contracts_cdcontract(contractId);
+                instDocs.add(installmentToDocument(inst));
+            }
+
+            getCollection().updateOne(
+                    Filters.eq("_id", contractId),
+                    Updates.pushEach("installments", instDocs));
+            System.out.println("Parcelas adicionadas ao contrato!");
+        } catch (Exception e) {
+            System.err.println("Erro ao adicionar parcelas: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Busca todos os contratos vinculados a um imóvel.
+     *
+     * @param propertyId Identificador do imóvel.
+     * @return Lista de contratos.
+     */
+    public List<Contracts> findContractsByProperty(int propertyId) {
+        List<Contracts> list = new ArrayList<>();
+        try (MongoCursor<Document> cursor = getCollection()
+                .find(Filters.eq("cdproperty", propertyId))
+                .sort(new Document("_id", 1))
+                .iterator()) {
+            while (cursor.hasNext()) {
+                list.add(fromDocument(cursor.next()));
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar contratos por imóvel: " + e.getMessage());
+        }
+        return list;
+    }
+
+    /**
+     * Busca todos os contratos em que um usuário é participante.
+     *
+     * @param userId Identificador do usuário.
+     * @return Lista de contratos.
+     */
+    public List<Contracts> findContractsByUser(int userId) {
+        List<Contracts> list = new ArrayList<>();
+        try (MongoCursor<Document> cursor = getCollection()
+                .find(Filters.eq("participants.cduser", userId))
+                .sort(new Document("_id", 1))
+                .iterator()) {
+            while (cursor.hasNext()) {
+                list.add(fromDocument(cursor.next()));
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar contratos por usuário: " + e.getMessage());
+        }
+        return list;
+    }
 
     /**
      * Resolve o nome do papel (role) a partir do código.

@@ -19,6 +19,10 @@ import model.Installments;
 import model.SignatureStatus;
 import model.User_Contract;
 import model.ContractRenewalType;
+import model.Addresses;
+import model.Properties;
+import model.Indexes;
+import model.Users;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -79,26 +83,33 @@ public class ContractView {
      * Menu principal de processos de negócio.
      */
     public void menu() {
-        System.out.println("\n--- PROCESSOS DE NEGÓCIO ---");
-        System.out.println("1. EFETIVAR NOVO CONTRATO");
-        System.out.println("2. VINCULAR PROPRIETÁRIO A IMÓVEL");
-        System.out.println("3. DESVINCULAR PROPRIETÁRIO DE IMÓVEL");
-        System.out.println("4. ALTERAR CONTRATO");
-        System.out.println("5. EXCLUIR CONTRATO");
-        System.out.println("6. ESTRUTURAR MODELO DE CONTRATO (VINCULAR TÓPICOS)");
-        System.out.println("7. PROCESSAR REAJUSTES MENSAIS (JOB MANUAL)");
-        System.out.println("8. PROCESSAR NOTIFICAÇÕES (JOB MANUAL)");
-        System.out.println("9. REGISTRAR PAGAMENTO DE PARCELA");
-        switch (lerIntSeguro("Escolha: ")) {
-            case 1: realizarNovoFluxo(); break;
-            case 2: vincularDono(); break;
-            case 3: desvincularDono(); break;
-            case 4: alterar(); break;
-            case 5: excluir(); break;
-            case 6: estruturarModelo(); break;
-            case 7: dispararJobReajuste(); break;
-            case 8: dispararJobNotificacoes(); break;
-            case 9: registrarPagamento(); break;
+        int op = -1;
+        while (op != 0) {
+            System.out.println("\n--- PROCESSOS DE NEGÓCIO ---");
+            System.out.println("1. EFETIVAR NOVO CONTRATO");
+            System.out.println("2. VINCULAR PROPRIETÁRIO A IMÓVEL");
+            System.out.println("3. DESVINCULAR PROPRIETÁRIO DE IMÓVEL");
+            System.out.println("4. ALTERAR CONTRATO");
+            System.out.println("5. EXCLUIR CONTRATO");
+            System.out.println("6. ESTRUTURAR MODELO DE CONTRATO (VINCULAR TÓPICOS)");
+            System.out.println("7. PROCESSAR REAJUSTES MENSAIS (JOB MANUAL)");
+            System.out.println("8. PROCESSAR NOTIFICAÇÕES (JOB MANUAL)");
+            System.out.println("9. REGISTRAR PAGAMENTO DE PARCELA");
+            System.out.println("0. VOLTAR");
+            op = lerIntSeguro("Escolha: ");
+            switch (op) {
+                case 1: realizarNovoFluxo(); break;
+                case 2: vincularDono(); break;
+                case 3: desvincularDono(); break;
+                case 4: alterar(); break;
+                case 5: excluir(); break;
+                case 6: estruturarModelo(); break;
+                case 7: dispararJobReajuste(); break;
+                case 8: dispararJobNotificacoes(); break;
+                case 9: registrarPagamento(); break;
+                case 0: break;
+                default: System.out.println("Opção inválida.");
+            }
         }
     }
     
@@ -107,7 +118,14 @@ public class ContractView {
 
         int idContrato = lerIdValido("ID do Contrato",
             contractDAO::findById,
-            () -> contractDAO.getActiveContractsList("geral").forEach(System.out::println));
+            () -> {
+                java.util.List<String> list = contractDAO.getActiveContractsList("geral");
+                if (list.isEmpty()) {
+                    System.out.println("\n  Nenhum contrato cadastrado. Cadastre um contrato primeiro.");
+                } else {
+                    list.forEach(System.out::println);
+                }
+            });
         if (idContrato <= 0) { System.out.println("Operação cancelada."); return; }
 
         List<Installments> pendentes = installmentDAO.findPendingInstallmentsByContractId(idContrato);
@@ -237,8 +255,14 @@ public class ContractView {
 
         int idTpl = lerIdValido("ID do Modelo",
                 templateDAO::findById,
-                () -> templateDAO.listAll().forEach(
-                        t -> System.out.println("ID: " + t.getCdtemplate() + " | " + t.getNmtemplate())));
+                () -> {
+                    java.util.List<model.Contract_Templates> list = templateDAO.listAll();
+                    if (list.isEmpty()) {
+                        System.out.println("\n  Nenhum modelo de contrato cadastrado. Cadastre um no módulo de Domínios Contratuais.");
+                    } else {
+                        list.forEach(t -> System.out.println("ID: " + t.getCdtemplate() + " | " + t.getNmtemplate()));
+                    }
+                });
         if (idTpl == -1) return;
 
         Contracts contract = new Contracts();
@@ -305,7 +329,10 @@ public class ContractView {
 
         System.out.println("\n--- DADOS DO TABELIONATO ---");
         model.Notaries n = new model.Notaries();
-        n.setCdcity(lerIdValido("Cidade do Tabelionato", cityDAO::findById, () -> cityDAO.listAll().forEach(System.out::println)));
+        n.setCdcity(lerIdValido("Cidade do Tabelionato", cityDAO::findById, () -> {
+            java.util.List<model.Cities> list = cityDAO.listAll();
+            if (list.isEmpty()) { System.out.println("\n  Nenhuma cidade cadastrada."); } else { list.forEach(System.out::println); }
+        }));
         n.setNrnotary(lerIntSeguro("Número: "));
         n.setBook(ler("Livro: "));
         n.setLeaf(ler("Folha: "));
@@ -317,7 +344,14 @@ public class ContractView {
             gerarParcelasAutomaticas(contract);
         }
 
-        int idIndex = lerIdValido("ID do Índice", indexDAO::findById, () -> indexDAO.listAll().forEach(System.out::println));
+        int idIndex = lerIdValido("ID do Índice", indexDAO::findById, () -> {
+            java.util.List<model.Indexes> list = indexDAO.listAll();
+            if (list.isEmpty()) {
+                System.out.println("\n  Nenhum índice cadastrado. Cadastre um no módulo de Domínios Contratuais.");
+            } else {
+                list.forEach(i -> System.out.println(i.getCdindex() + " - " + i.getNmindex()));
+            }
+        });
         if (idIndex > 0) {
             contract.setCdindex(idIndex);
             contractDAO.updateContract(contract);
@@ -328,6 +362,83 @@ public class ContractView {
             addressDAO, installmentDAO, bankAccountDAO, indexDAO, notaryDAO, occupationDAO
         );
         pdfService.generateContractPdf(cdcontract);
+        imprimirResumoContrato(cdcontract);
+    }
+
+    /**
+     * Imprime um resumo do contrato recém-criado no terminal.
+     */
+    private void imprimirResumoContrato(int cdcontract) {
+        Contracts c = contractDAO.findById(cdcontract);
+        if (c == null) return;
+
+        java.time.format.DateTimeFormatter df = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+
+        System.out.println("\n========================================");
+        System.out.println("   RESUMO DO CONTRATO CADASTRADO");
+        System.out.println("========================================");
+        System.out.println("ID:         " + c.getCdcontract());
+        System.out.println("Título:     " + c.getDstitle());
+        System.out.println("Criação:    " + (c.getDtcreation() != null ? c.getDtcreation().format(df) : "N/A"));
+        System.out.println("Vencimento: " + (c.getDtlimit() != null ? c.getDtlimit().format(df) : "Indeterminado"));
+        System.out.println("Status:     " + model.ContractStatus.fromCode(c.getCdstatus()).getDescription());
+
+        // Imóvel
+        Properties prop = propertyDAO.findById(c.getCdproperty());
+        if (prop != null) {
+            System.out.println("\n--- IMÓVEL ---");
+            System.out.println("ID: " + prop.getCdproperty() + " | Matrícula: " + prop.getNrregistration());
+            System.out.println("Tipo: " + prop.getCdtype() + " | Finalidade: " + prop.getCdpurpose());
+            Addresses addr = propertyDAO.findAddressByPropertyId(prop.getCdproperty());
+            if (addr != null) {
+                System.out.println("Endereço: " + addr.getNmstreet() + ", " + addr.getNraddress() + " - " + addr.getDistrict() + ", " + addr.getCity());
+            }
+        }
+
+        // Participantes
+        List<User_Contract> partes = userContractDAO.findByContractId(cdcontract);
+        if (!partes.isEmpty()) {
+            System.out.println("\n--- PARTICIPANTES ---");
+            for (User_Contract uc : partes) {
+                Users u = userDAO.findById(uc.getCduser());
+                String roleName;
+                switch (uc.getCdrole()) {
+                    case 1: roleName = "Locatário"; break;
+                    case 2: roleName = "Locador"; break;
+                    case 3: roleName = "Testemunha"; break;
+                    case 4: roleName = "Representante"; break;
+                    default: roleName = "Outro"; break;
+                }
+                System.out.println("  " + roleName + ": " + (u != null ? u.getNmuser() : "ID " + uc.getCduser()) + " (CPF: " + (u != null ? u.getDocument() : "N/A") + ")");
+            }
+        }
+
+        // Parcelas
+        List<Installments> installments = installmentDAO.findByContractId(cdcontract);
+        if (!installments.isEmpty()) {
+            System.out.println("\n--- PARCELAS (" + installments.size() + " total) ---");
+            System.out.printf("%-5s | %-12s | %-12s | %-8s%n", "Nº", "Vencimento", "Valor", "Status");
+            System.out.println("----------------------------------------------");
+            for (Installments inst : installments) {
+                double valor = inst.getVladjusted() > 0 ? inst.getVladjusted() : inst.getVlbase();
+                String status = inst.getCdstatus() == 2 ? "Pago" : "Pendente";
+                System.out.printf("%-5d | %-12s | R$ %-9.2f | %-8s%n",
+                    inst.getNrinstallment(),
+                    inst.getDtdue() != null ? inst.getDtdue().format(df) : "N/A",
+                    valor, status);
+            }
+            System.out.printf("\nMulta: %.2f%% | Juros: %.2f%%%n", installments.get(0).getVlpenalty(), installments.get(0).getVlinterest());
+        }
+
+        // Índice
+        if (c.getCdindex() > 0) {
+            Indexes idx = indexDAO.findById(c.getCdindex());
+            if (idx != null) {
+                System.out.println("Índice de Reajuste: " + idx.getNmindex());
+            }
+        }
+
+        System.out.println("========================================\n");
     }
 
     private void vincularParte(int cdcontract, int cduser, int cdrole) {
@@ -407,15 +518,24 @@ public class ContractView {
     }
 
     private void vincularDono() {
-        int idP = lerIdValido("ID Imóvel", propertyDAO::findById, () -> propertyDAO.getAvailableProperties().forEach(System.out::println));
-        int idU = lerIdValido("ID Usuário", userDAO::findById, () -> userDAO.getAllUsersList().forEach(System.out::println));
+        int idP = lerIdValido("ID Imóvel", propertyDAO::findById, () -> {
+            java.util.List<String> list = propertyDAO.getAvailableProperties();
+            if (list.isEmpty()) { System.out.println("\n  Nenhum imóvel cadastrado."); } else { list.forEach(System.out::println); }
+        });
+        int idU = lerIdValido("ID Usuário", userDAO::findById, () -> {
+            java.util.List<String> list = userDAO.getAllUsersList();
+            if (list.isEmpty()) { System.out.println("\n  Nenhum usuário cadastrado."); } else { list.forEach(System.out::println); }
+        });
         if (idP > 0 && idU > 0 && !propertyDAO.hasAlreadyThisOwner(idP, idU)) {
             propertyDAO.linkOwner(idP, idU);
         }
     }
 
     private void desvincularDono() {
-        int idP = lerIdValido("ID Imóvel", propertyDAO::findById, () -> propertyDAO.getPropertiesWithOwners().forEach(System.out::println));
+        int idP = lerIdValido("ID Imóvel", propertyDAO::findById, () -> {
+            java.util.List<String> list = propertyDAO.getPropertiesWithOwners();
+            if (list.isEmpty()) { System.out.println("\n  Nenhum imóvel com proprietário vinculado."); } else { list.forEach(System.out::println); }
+        });
         if (idP <= 0) return;
         if (propertyDAO.hasActiveContract(idP)) {
             System.out.println("ERRO: este imóvel possui contrato(s) ativo(s). "
@@ -429,7 +549,14 @@ public class ContractView {
     }
 
     private void alterar() {
-        int idC = lerIdValido("ID Contrato", contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println));
+        int idC = lerIdValido("ID Contrato", contractDAO::findById, () -> {
+            java.util.List<String> list = contractDAO.getActiveContractsList();
+            if (list.isEmpty()) {
+                System.out.println("\n  Nenhum contrato cadastrado.");
+            } else {
+                list.forEach(System.out::println);
+            }
+        });
         if (idC <= 0) return;
         Contracts c = contractDAO.findById(idC);
         c.setDstitle(lerOuManter("Título", c.getDstitle()));
@@ -437,7 +564,14 @@ public class ContractView {
     }
 
     private void excluir() {
-        int idC = lerIdValido("ID Contrato", contractDAO::findById, () -> contractDAO.getActiveContractsList().forEach(System.out::println));
+        int idC = lerIdValido("ID Contrato", contractDAO::findById, () -> {
+            java.util.List<String> list = contractDAO.getActiveContractsList();
+            if (list.isEmpty()) {
+                System.out.println("\n  Nenhum contrato cadastrado.");
+            } else {
+                list.forEach(System.out::println);
+            }
+        });
         if (idC <= 0) return;
         if (confirmar("Excluir contrato e todos os vínculos? (s/n): ")) {
             contractDAO.deleteContract(idC);
@@ -445,7 +579,14 @@ public class ContractView {
     }
 
     private void estruturarModelo() {
-        int idTpl = lerIdValido("ID Modelo", templateDAO::findById, () -> templateDAO.listAll().forEach(t -> System.out.println(t.getCdtemplate() + " - " + t.getNmtemplate())));
+        int idTpl = lerIdValido("ID Modelo", templateDAO::findById, () -> {
+            java.util.List<model.Contract_Templates> list = templateDAO.listAll();
+            if (list.isEmpty()) {
+                System.out.println("\n  Nenhum modelo cadastrado.");
+            } else {
+                list.forEach(t -> System.out.println(t.getCdtemplate() + " - " + t.getNmtemplate()));
+            }
+        });
         if (idTpl <= 0) return;
         while (true) {
             int idTopic = lerIntSeguro("ID Tópico para vincular (0 para concluir): ");

@@ -139,18 +139,37 @@ public class DomainCrudView {
      * Menu para gestão de domínios relacionados a contratos.
      */
     public void menuAtributosContratuais() {
-        System.out.println("\n--- DOMÍNIOS CONTRATUAIS ---");
-        System.out.println("1. Modelos (Templates)  2. Cláusulas  3. Índices  4. Taxas de Índice  5. Papéis");
-        System.out.println("6. Tópicos  7. Corretores  8. Exportar Modelo para PDF  0. Voltar");
-        switch (lerIntSeguro("Escolha: ")) {
-            case 1: crudContractTemplate(); break;
-            case 2: crudClause(); break;
-            case 3: crudIndex(); break;
-            case 4: crudIndexRate(); break;
-            case 5: crudRole(); break;
-            case 6: crudTopic(); break;
-            case 7: crudBrokerData(); break;
-            case 8: exportTemplatePdf(); break;
+        int op = -1;
+        while (op != 0) {
+            System.out.println("\n--- MODELOS DE CONTRATO ---");
+            System.out.println("1. Modelos (Templates)  2. Tópicos  3. Cláusulas  4. Exportar Modelo para PDF  0. Voltar");
+            op = lerIntSeguro("Escolha: ");
+            switch (op) {
+                case 1: crudContractTemplate(); break;
+                case 2: crudTopic(); break;
+                case 3: crudClause(); break;
+                case 4: exportTemplatePdf(); break;
+                case 0: break;
+                default: System.out.println("Opção inválida.");
+            }
+        }
+    }
+
+    /**
+     * Menu para gestão de índices financeiros e taxas.
+     */
+    public void menuIndices() {
+        int op = -1;
+        while (op != 0) {
+            System.out.println("\n--- ÍNDICES FINANCEIROS ---");
+            System.out.println("1. Índices (IPCA, IGP-M, etc.)  2. Taxas de Índice  0. Voltar");
+            op = lerIntSeguro("Escolha: ");
+            switch (op) {
+                case 1: crudIndex(); break;
+                case 2: crudIndexRate(); break;
+                case 0: break;
+                default: System.out.println("Opção inválida.");
+            }
         }
     }
 
@@ -225,26 +244,16 @@ public class DomainCrudView {
     }
 
     private void crudAddress() {
-        CrudConsole.run("Endereços",
-                () -> {
-                    Addresses a = new Addresses();
-                    a.setCdzipcode(ler("CEP: "));
-                    a.setNmstreet(ler("Rua: "));
-                    a.setNraddress(ler("Número: "));
-                    a.setDscomplement(ler("Complemento: "));
-                    a.setCddistrict(lerInt("ID Bairro: "));
-                    return a;
-                },
-                a -> {
-                    a.setCdzipcode(lerOuManter("Novo CEP", a.getCdzipcode()));
-                    a.setNmstreet(lerOuManter("Nova Rua", a.getNmstreet()));
-                    a.setNraddress(lerOuManter("Novo Número", a.getNraddress()));
-                    a.setDscomplement(lerOuManter("Novo Complemento", a.getDscomplement()));
-                    a.setCddistrict(lerIntOuManter("Novo ID Bairro", a.getCddistrict()));
-                },
-                addressDAO::findById,
-                a -> a.getCdaddress() + " - " + a.getNmstreet() + ", " + a.getNraddress() + " (" + a.getCdzipcode() + ")",
-                CrudConsole.adapt(addressDAO::insert, addressDAO::update, addressDAO::delete, addressDAO::listAll));
+        System.out.println("\n[Endereços] Endereços são embarcados em usuários e imóveis.");
+        System.out.println("1. Listar todos  0. Voltar");
+        int op = ConsoleIO.lerIntSeguro("Escolha: ");
+        if (op == 1) {
+            System.out.println("\n--- ENDEREÇOS CADASTRADOS ---");
+            addressDAO.listAllFormatted().forEach(System.out::println);
+            if (addressDAO.listAllFormatted().isEmpty()) {
+                System.out.println("Nenhum endereço cadastrado. Cadastre usuários ou imóveis para criar endereços.");
+            }
+        }
     }
 
     private void crudPropertyType() {

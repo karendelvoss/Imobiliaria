@@ -139,6 +139,23 @@ public final class ConsoleIO {
     }
 
     /**
+     * Imprime uma lista formatada ou uma mensagem de "vazio" caso não haja registros.
+     * 
+     * @param items Lista de strings a exibir.
+     * @param titulo Título da seção.
+     * @param msgVazio Mensagem quando vazio.
+     */
+    public static void imprimirListaOuVazio(java.util.List<String> items, String titulo, String msgVazio) {
+        if (items == null || items.isEmpty()) {
+            System.out.println("\n  " + msgVazio);
+        } else {
+            if (titulo != null) System.out.println("\n--- " + titulo + " ---");
+            items.forEach(System.out::println);
+            System.out.println();
+        }
+    }
+
+    /**
      * Lê um ID e valida sua existência no banco de dados.
      * Permite comandos de listar, novo registro ou cancelar.
      * 
@@ -149,6 +166,41 @@ public final class ConsoleIO {
      */
     public static <T> int lerIdValido(String label, IntFunction<T> finder, Runnable fallbackLista) {
         return lerIdValido(label, finder, fallbackLista, null);
+    }
+
+    /**
+     * Versão somente-leitura do lerIdValido — sem opção de criar novo registro.
+     * Mostra apenas [L] Listar | [0] Cancelar.
+     * 
+     * @param label Texto de prompt.
+     * @param finder Função de busca do objeto pelo ID.
+     * @param fallbackLista Ação para listar registros existentes.
+     * @return ID válido ou -1 se cancelado.
+     */
+    public static <T> int lerIdValidoSomenteLeitura(String label, IntFunction<T> finder, Runnable fallbackLista) {
+        while (true) {
+            System.out.println("\n[L] Listar | [0] Cancelar");
+            String input = ler(label + " (ou digite L/0/ID): ");
+
+            if (input.isEmpty() || input.equals("0")) return -1;
+
+            if (input.equalsIgnoreCase("L")) {
+                if (fallbackLista != null) {
+                    fallbackLista.run();
+                } else {
+                    System.out.println("Lista indisponível.");
+                }
+                continue;
+            }
+
+            try {
+                int id = Integer.parseInt(input);
+                if (finder.apply(id) != null) return id;
+                System.out.println("ERRO: ID não encontrado no sistema.");
+            } catch (NumberFormatException e) {
+                System.out.println("Entrada inválida. Digite um número, L ou 0.");
+            }
+        }
     }
 
     /**

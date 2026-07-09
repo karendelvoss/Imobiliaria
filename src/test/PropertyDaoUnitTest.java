@@ -252,9 +252,9 @@ public class PropertyDaoUnitTest {
         p.setNrregistration(registration);
         p.setDsdescription("Imóvel de teste unitário");
         p.setVltotalarea(75.0);
-        p.setCdtype(1);
-        p.setCdpurpose(1);
-        p.setCdstatus(2);
+        p.setCdtype("Casa");
+        p.setCdpurpose("Residencial");
+        p.setCdstatus("Disponível");
         return p;
     }
 

@@ -1,6 +1,5 @@
 package view;
 
-import dao.AddressDAO;
 import dao.PropertyDAO;
 import dao.PropertyTypeDAO;
 import dao.PropertyPurposeDAO;
@@ -29,14 +28,31 @@ public class PropertyView {
      * Menu principal para operações com imóveis.
      */
     public void menu() {
-        System.out.println("\n--- SUBMENU: IMÓVEIS ---");
-        System.out.println("1. Cadastrar 2. Consultar 3. Atualizar 4. Excluir");
-        switch (lerIntSeguro("Escolha: ")) {
-            case 1: cadastrar(); break;
-            case 2: consultar(); break;
-            case 3: atualizar(); break;
-            case 4: excluir(); break;
-            default: System.out.println("Opção inválida.");
+        int op = -1;
+        while (op != 0) {
+            System.out.println("\n--- SUBMENU: IMÓVEIS ---");
+            System.out.println("1. Cadastrar 2. Listar 3. Consultar 4. Atualizar 5. Excluir 0. Voltar");
+            op = lerIntSeguro("Escolha: ");
+            switch (op) {
+                case 1: cadastrar(); break;
+                case 2: listarTodos(); break;
+                case 3: consultar(); break;
+                case 4: atualizar(); break;
+                case 5: excluir(); break;
+                case 0: break;
+                default: System.out.println("Opção inválida.");
+            }
+        }
+    }
+
+    private void listarTodos() {
+        java.util.List<String> imoveis = propertyDAO.listAllFormatted();
+        if (imoveis.isEmpty()) {
+            System.out.println("\nNenhum imóvel cadastrado.");
+            if (confirmar("Deseja cadastrar um novo? (s/n): ")) { cadastrar(); }
+        } else {
+            System.out.println("\n--- LISTA DE IMÓVEIS ---");
+            imoveis.forEach(System.out::println);
         }
     }
 
@@ -52,23 +68,23 @@ public class PropertyView {
         p.setDsdescription(ler("Descrição: "));
         p.setVltotalarea(lerDouble("Área Total (m²): "));
 
-        int idAddress = lerIdValido("ID Endereço", id -> checkExists("Addresses", "cdaddress", id) ? id : null, this::listAddresses);
-        if (idAddress == -1) { System.out.println("Cadastro cancelado."); return -1; }
-        p.setCdaddress(idAddress);
+        // Endereço embarcado diretamente no imóvel
+        System.out.println("\n--- ENDEREÇO DO IMÓVEL ---");
+        model.Addresses endereco = UserView.lerEndereco();
 
         int idType = lerIdValido("ID Tipo", id -> checkExists("Property_Types", "cdtype", id) ? id : null, this::listPropertyTypes);
         if (idType == -1) { System.out.println("Cadastro cancelado."); return -1; }
-        p.setCdtype(idType);
+        p.setCdtype(resolveTypeName(idType));
 
         int idPurpose = lerIdValido("ID Finalidade", id -> checkExists("Property_Purposes", "cdpurpose", id) ? id : null, this::listPropertyPurposes);
         if (idPurpose == -1) { System.out.println("Cadastro cancelado."); return -1; }
-        p.setCdpurpose(idPurpose);
+        p.setCdpurpose(resolvePurposeName(idPurpose));
 
         int idStatus = lerIdValido("ID Status", id -> checkExists("Property_Status", "cdstatus", id) ? id : null, this::listPropertyStatus);
         if (idStatus == -1) { System.out.println("Cadastro cancelado."); return -1; }
-        p.setCdstatus(idStatus);
+        p.setCdstatus(resolveStatusName(idStatus));
 
-        int idProperty = propertyDAO.insertProperty(p);
+        int idProperty = propertyDAO.insertPropertyWithAddress(p, endereco);
         if (idProperty > 0) {
             vincularProprietarioObrigatorio(idProperty);
         }
@@ -95,13 +111,24 @@ public class PropertyView {
     }
 
     private void consultar() {
-        int id = lerIdValido("ID do Imóvel para consulta (0 para cancelar)",
-                propertyDAO::findById,
-                () -> propertyDAO.getAvailableProperties().forEach(System.out::println));
-        if (id == -1) { System.out.println("Operação cancelada."); return; }
+        String input = ler("\nDigite o ID do imóvel para consultar (0 para voltar): ").trim();
+        if (input.equals("0") || input.isEmpty()) return;
 
-        String info = propertyDAO.findByIdDetalhado(id);
-        System.out.println(info != null ? info : "Erro ao carregar detalhes do imóvel.");
+        int id;
+        try {
+            id = Integer.parseInt(input);
+        } catch (NumberFormatException e) {
+            System.out.println("Entrada inválida. Digite um número.");
+            return;
+        }
+
+        Properties p = propertyDAO.findById(id);
+        if (p != null) {
+            String info = propertyDAO.findByIdDetalhado(id);
+            System.out.println(info != null ? info : "Erro ao carregar detalhes.");
+        } else {
+            System.out.println("Imóvel com ID " + id + " não encontrado.");
+        }
     }
 
     private void atualizar() {
@@ -116,10 +143,15 @@ public class PropertyView {
         p.setNrregistration(lerOuManter("Matrícula", p.getNrregistration()));
         p.setDsdescription(lerOuManter("Descrição", p.getDsdescription()));
         
-        p.setCdaddress(lerIdOuManter("ID Endereço", p.getCdaddress(), idAddr -> checkExists("Addresses", "cdaddress", idAddr) ? idAddr : null, this::listAddresses));
-        p.setCdtype(lerIdOuManter("ID Tipo", p.getCdtype(), idType -> checkExists("Property_Types", "cdtype", idType) ? idType : null, this::listPropertyTypes));
-        p.setCdpurpose(lerIdOuManter("ID Finalidade", p.getCdpurpose(), idPurp -> checkExists("Property_Purposes", "cdpurpose", idPurp) ? idPurp : null, this::listPropertyPurposes));
-        p.setCdstatus(lerIdOuManter("ID Status", p.getCdstatus(), idStat -> checkExists("Property_Status", "cdstatus", idStat) ? idStat : null, this::listPropertyStatus));
+        // Atualizar endereço embarcado
+        if (confirmar("Atualizar endereço? (s/n): ")) {
+            model.Addresses endereco = UserView.lerEndereco();
+            propertyDAO.updateAddress(id, endereco);
+        }
+
+        p.setCdtype(resolveTypeName(lerIdOuManter("ID Tipo", reverseTypeName(p.getCdtype()), idType -> checkExists("Property_Types", "cdtype", idType) ? idType : null, this::listPropertyTypes)));
+        p.setCdpurpose(resolvePurposeName(lerIdOuManter("ID Finalidade", reversePurposeName(p.getCdpurpose()), idPurp -> checkExists("Property_Purposes", "cdpurpose", idPurp) ? idPurp : null, this::listPropertyPurposes)));
+        p.setCdstatus(resolveStatusName(lerIdOuManter("ID Status", reverseStatusName(p.getCdstatus()), idStat -> checkExists("Property_Status", "cdstatus", idStat) ? idStat : null, this::listPropertyStatus)));
 
         propertyDAO.updateProperty(p);
         System.out.println("Imóvel atualizado com sucesso!");
@@ -133,8 +165,17 @@ public class PropertyView {
 
         Properties p = propertyDAO.findById(id);
 
-        if (p.getCdstatus() != 2) { // Status 2 = Disponível
-            System.out.println("\nAVISO: O imóvel ID " + id + " não está 'Disponível' (pode estar alugado/vendido), exclusão não permitida!");
+        // Verifica se tem contrato ativo vinculado
+        if (propertyDAO.hasActiveContract(id)) {
+            System.out.println("\nAVISO: O imóvel ID " + id + " possui contrato ativo vinculado, exclusão não permitida!");
+            if (confirmar("Ver lista de imóveis aptos para exclusão? (s/n): ")) mostrarExcluiveis();
+            return;
+        }
+
+        // Verifica status (Alugado não pode excluir)
+        String status = p.getCdstatus();
+        if (status != null && "Alugado".equalsIgnoreCase(status)) {
+            System.out.println("\nAVISO: O imóvel ID " + id + " está 'Alugado', exclusão não permitida!");
             if (confirmar("Ver lista de imóveis aptos para exclusão? (s/n): ")) mostrarExcluiveis();
             return;
         }
@@ -146,15 +187,28 @@ public class PropertyView {
     }
 
     private void mostrarExcluiveis() {
-        System.out.println("\n--- IMÓVEIS APTOS PARA EXCLUSÃO (DISPONÍVEIS) ---");
-        propertyDAO.getAvailableProperties().forEach(System.out::println);
+        System.out.println("\n--- IMÓVEIS APTOS PARA EXCLUSÃO ---");
+        java.util.List<String> aptos = propertyDAO.getAvailableOnly();
+        if (aptos.isEmpty()) {
+            // Se não tem "Disponível", mostra os que não têm contrato ativo
+            java.util.List<model.Properties> todos = propertyDAO.listAll();
+            boolean encontrou = false;
+            for (model.Properties p : todos) {
+                if (!propertyDAO.hasActiveContract(p.getCdproperty()) && !"Alugado".equalsIgnoreCase(p.getCdstatus())) {
+                    System.out.println("ID: " + p.getCdproperty() + " | Reg: " + p.getNrregistration() + " | Status: " + p.getCdstatus());
+                    encontrou = true;
+                }
+            }
+            if (!encontrou) {
+                System.out.println("Nenhum imóvel apto para exclusão (todos possuem contratos ativos ou estão alugados).");
+            }
+        } else {
+            aptos.forEach(System.out::println);
+        }
     }
 
     private boolean checkExists(String tableName, String idColumnName, int id) {
         switch (tableName) {
-            case "Addresses":
-                AddressDAO addressDAO = new AddressDAO();
-                return addressDAO.findById(id) != null;
             case "Property_Types":
                 PropertyTypeDAO typeDAO = new PropertyTypeDAO();
                 return typeDAO.findById(id) != null;
@@ -167,12 +221,6 @@ public class PropertyView {
             default:
                 return false;
         }
-    }
-
-    private void listAddresses() {
-        System.out.println("\n--- ENDEREÇOS DISPONÍVEIS ---");
-        AddressDAO addressDAO = new AddressDAO();
-        addressDAO.listAllFormatted().forEach(System.out::println);
     }
 
     private void listPropertyTypes() {
@@ -194,5 +242,34 @@ public class PropertyView {
         PropertyStatusDAO statusDAO = new PropertyStatusDAO();
         statusDAO.listAll().forEach(ps ->
             System.out.println("ID: " + ps.getCdstatus() + " | " + ps.getNmstatus()));
+    }
+
+    // ========== Resolução ID → Texto (NoSQL-nativo) ==========
+
+    private static final java.util.Map<Integer, String> TYPE_MAP = java.util.Map.of(
+        1, "Casa", 2, "Apartamento", 3, "Terreno", 4, "Sala Comercial", 5, "Galpão"
+    );
+    private static final java.util.Map<Integer, String> PURPOSE_MAP = java.util.Map.of(
+        1, "Residencial", 2, "Comercial", 3, "Industrial"
+    );
+    private static final java.util.Map<Integer, String> STATUS_MAP = java.util.Map.of(
+        1, "Alugado", 2, "Disponível", 3, "Vendido"
+    );
+
+    private String resolveTypeName(int id) { return TYPE_MAP.getOrDefault(id, "Outro"); }
+    private String resolvePurposeName(int id) { return PURPOSE_MAP.getOrDefault(id, "Outro"); }
+    private String resolveStatusName(int id) { return STATUS_MAP.getOrDefault(id, "Disponível"); }
+
+    private int reverseTypeName(String name) {
+        for (var e : TYPE_MAP.entrySet()) if (e.getValue().equalsIgnoreCase(name)) return e.getKey();
+        return 1;
+    }
+    private int reversePurposeName(String name) {
+        for (var e : PURPOSE_MAP.entrySet()) if (e.getValue().equalsIgnoreCase(name)) return e.getKey();
+        return 1;
+    }
+    private int reverseStatusName(String name) {
+        for (var e : STATUS_MAP.entrySet()) if (e.getValue().equalsIgnoreCase(name)) return e.getKey();
+        return 2;
     }
 }

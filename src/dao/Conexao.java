@@ -12,10 +12,9 @@ import org.bson.Document;
  */
 public class Conexao {
 
-    private static final String HOST = "localhost";
-    private static final int PORT = 27017;
     private static final String DATABASE = "imobiliaria";
-    private static final String CONNECTION_STRING = "mongodb://" + HOST + ":" + PORT;
+    private static final String CONNECTION_STRING =
+            "mongodb+srv://delvossribas:AemBsxTH1hEuFrHT@imobiliaria.f7x4ou9.mongodb.net/?appName=imobiliaria";
 
     private static MongoClient client;
 

@@ -1,8 +1,6 @@
 package view;
 
 import dao.UserDAO;
-import dao.AddressDAO;
-import dao.OccupationDAO;
 import model.Users;
 
 import java.time.LocalDate;
@@ -28,14 +26,40 @@ public class UserView {
      * Menu principal para operações com usuários.
      */
     public void menu() {
-        System.out.println("\n--- SUBMENU: USUÁRIOS ---");
-        System.out.println("1. Cadastrar 2. Consultar 3. Atualizar 4. Excluir");
-        switch (lerIntSeguro("Escolha: ")) {
-            case 1: cadastrar(); break;
-            case 2: consultar(); break;
-            case 3: atualizar(); break;
-            case 4: excluir(); break;
-            default: System.out.println("Opção inválida.");
+        int op = -1;
+        while (op != 0) {
+            System.out.println("\n--- SUBMENU: USUÁRIOS ---");
+            System.out.println("1. Cadastrar 2. Listar 3. Consultar 4. Atualizar 5. Excluir 0. Voltar");
+            op = lerIntSeguro("Escolha: ");
+            switch (op) {
+                case 1: cadastrar(); break;
+                case 2: listar(); break;
+                case 3: consultar(); break;
+                case 4: atualizar(); break;
+                case 5: excluir(); break;
+                case 0: break;
+                default: System.out.println("Opção inválida.");
+            }
+        }
+    }
+
+    /**
+     * Lista todos os usuários cadastrados.
+     */
+    private void listar() {
+        List<Users> usuarios = userDAO.listAllUsers();
+        if (usuarios.isEmpty()) {
+            System.out.println("\nNenhum usuário cadastrado.");
+            if (confirmar("Deseja cadastrar um novo? (s/n): ")) {
+                cadastrar();
+            }
+            return;
+        }
+        System.out.println("\n--- LISTA DE USUÁRIOS ---");
+        for (Users u : usuarios) {
+            System.out.printf("ID: %d | Nome: %s | CPF: %s | Celular: %s | Profissão: %s%n",
+                u.getCduser(), u.getNmuser(), u.getDocument(),
+                u.getNrcellphone(), u.getOccupation() != null ? u.getOccupation() : "N/A");
         }
     }
 
@@ -46,76 +70,230 @@ public class UserView {
      */
     public int cadastrar() {
         Users u = new Users();
-        u.setNmuser(ler("Nome: "));
         
+        // Nome: obrigatório, mínimo 3 chars, sem números
         while (true) {
-            String doc = ler("Doc (Apenas 11 números): ");
-            if (doc.matches("\\d{11}")) {
-                u.setDocument(doc);
-                u.setFgdocument(true);
-                break;
+            String nome = ler("Nome: ").trim();
+            if (nome.length() < 3) {
+                System.out.println("ERRO: O nome deve ter no mínimo 3 caracteres.");
+                continue;
             }
-            System.out.println("ERRO: O documento deve conter exatamente 11 números!");
+            if (nome.matches(".*\\d.*")) {
+                System.out.println("ERRO: O nome não pode conter números.");
+                continue;
+            }
+            u.setNmuser(nome);
+            break;
+        }
+        
+        // Documento (CPF): 11 dígitos + validação dos dígitos verificadores
+        while (true) {
+            String doc = ler("CPF (apenas 11 números): ").replaceAll("[^0-9]", "");
+            if (doc.length() != 11) {
+                System.out.println("ERRO: O CPF deve conter exatamente 11 números.");
+                continue;
+            }
+            if (!validarCPF(doc)) {
+                System.out.println("ERRO: CPF inválido (dígitos verificadores incorretos).");
+                continue;
+            }
+            u.setDocument(doc);
+            u.setFgdocument(true);
+            break;
         }
 
-        u.setDsissuingbody(ler("Órgão Emissor do Documento: "));
-        
+        // Órgão emissor: obrigatório
         while (true) {
-            String cel = ler("Celular (Ex: 11 98888-7777): ");
-            if (cel.matches("\\d{2,3} \\d{4,5}-\\d{4}")) {
+            String orgao = ler("Órgão Emissor (Ex: SSP/SC): ").trim();
+            if (orgao.isEmpty()) {
+                System.out.println("ERRO: O órgão emissor é obrigatório.");
+                continue;
+            }
+            u.setDsissuingbody(orgao);
+            break;
+        }
+        
+        // Celular: aceita formatos variados, normaliza
+        while (true) {
+            String cel = ler("Celular (Ex: 47 99999-8888): ").trim();
+            String celLimpo = cel.replaceAll("[^0-9]", "");
+            if (celLimpo.length() < 10 || celLimpo.length() > 11) {
+                System.out.println("ERRO: O celular deve ter 10 ou 11 dígitos (DDD + número).");
+                continue;
+            }
+            // Normaliza para formato "DD NNNNN-NNNN"
+            if (cel.matches("\\d{2,3}\\s?\\d{4,5}[-\\s]?\\d{4}") || celLimpo.length() >= 10) {
                 u.setNrcellphone(cel);
                 break;
             }
-            System.out.println("ERRO: Formato de celular inválido.");
+            System.out.println("ERRO: Formato de celular inválido. Ex: 47 99999-8888");
         }
         
+        // Data de nascimento: válida, não futura, idade entre 0 e 150
         while (true) {
-            String dataStr = ler("Data Nasc (AAAA-MM-DD): ");
+            String dataStr = ler("Data Nasc (AAAA-MM-DD): ").trim();
             try {
-                u.setDtbirth(LocalDate.parse(dataStr.replace("/", "-")));
+                LocalDate dt = LocalDate.parse(dataStr.replace("/", "-"));
+                if (dt.isAfter(LocalDate.now())) {
+                    System.out.println("ERRO: A data de nascimento não pode ser no futuro.");
+                    continue;
+                }
+                int idade = LocalDate.now().getYear() - dt.getYear();
+                if (idade > 150) {
+                    System.out.println("ERRO: Data improvável (mais de 150 anos).");
+                    continue;
+                }
+                u.setDtbirth(dt);
                 break;
             } catch (Exception e) {
-                System.out.println("ERRO: Data inválida!");
+                System.out.println("ERRO: Data inválida! Use o formato AAAA-MM-DD (Ex: 1990-05-20).");
             }
         }
         
-        int idAdd = lerIdValido("ID Endereço (0 para cancelar)", 
-                id -> checkAddressExists(id) ? id : null, 
-                this::listAddresses);
-        if (idAdd == -1) return -1;
-        u.setCdaddress(idAdd);
+        // Endereço embarcado com validações
+        System.out.println("\n--- ENDEREÇO DO USUÁRIO ---");
+        model.Addresses endereco = lerEnderecoValidado();
 
-        int idOcc = lerIdValido("ID Profissão (0 para cancelar)", 
-                id -> checkOccupationExists(id) ? id : null, 
-                this::listOccupations);
-        if (idOcc == -1) return -1;
-        u.setCdoccupation(idOcc);
+        // Profissão: obrigatória
+        String profissao;
+        while (true) {
+            profissao = ler("Profissão: ").trim();
+            if (profissao.isEmpty()) {
+                System.out.println("ERRO: A profissão é obrigatória.");
+                continue;
+            }
+            break;
+        }
         
-        userDAO.saveUser(u, null);
+        userDAO.saveUserWithAddress(u, endereco, profissao, null);
         return u.getCduser();
     }
 
-    private void consultar() {
+    /**
+     * Coleta os dados de endereço com validações.
+     */
+    public static model.Addresses lerEnderecoValidado() {
+        model.Addresses a = new model.Addresses();
+        
+        // CEP: 8 dígitos
         while (true) {
-            String input = ler("\nID do Usuário para consulta detalhada: ").trim();
-            if (input.isEmpty()) return;
-
-            int id;
-            try {
-                id = Integer.parseInt(input);
-            } catch (NumberFormatException e) {
-                System.out.println("Entrada inválida. Digite um número inteiro ou pressione ENTER para voltar.");
+            String cep = ler("CEP (8 dígitos): ").replaceAll("[^0-9]", "");
+            if (cep.length() != 8) {
+                System.out.println("ERRO: O CEP deve ter exatamente 8 dígitos.");
                 continue;
             }
-
-            Users u = userDAO.findById(id);
-            if (u != null) {
-                imprimir(u);
-                return;
+            a.setCdzipcode(cep);
+            break;
+        }
+        
+        // Rua: obrigatória
+        while (true) {
+            String rua = ler("Rua: ").trim();
+            if (rua.isEmpty()) { System.out.println("ERRO: A rua é obrigatória."); continue; }
+            a.setNmstreet(rua);
+            break;
+        }
+        
+        // Número: deve ser numérico ou "S/N"
+        while (true) {
+            String num = ler("Número: ").trim();
+            if (num.isEmpty()) { System.out.println("ERRO: O número é obrigatório."); continue; }
+            if (!num.matches("\\d+") && !num.equalsIgnoreCase("S/N")) {
+                System.out.println("ERRO: Digite um número válido (Ex: 100) ou S/N se não houver.");
+                continue;
             }
-            if (confirmar("Usuário não encontrado. Listar todos? (s/n): ")) {
-                userDAO.getAllUsersList().forEach(System.out::println);
-            } else return;
+            a.setNraddress(num);
+            break;
+        }
+        
+        a.setDscomplement(ler("Complemento (ou ENTER para pular): ").trim());
+        
+        // Bairro: obrigatório
+        while (true) {
+            String bairro = ler("Bairro: ").trim();
+            if (bairro.isEmpty()) { System.out.println("ERRO: O bairro é obrigatório."); continue; }
+            a.setDistrict(bairro);
+            break;
+        }
+        
+        // Cidade: obrigatória
+        while (true) {
+            String cidade = ler("Cidade: ").trim();
+            if (cidade.isEmpty()) { System.out.println("ERRO: A cidade é obrigatória."); continue; }
+            a.setCity(cidade);
+            break;
+        }
+        
+        // Estado: 2 letras
+        while (true) {
+            String estado = ler("Estado (UF, Ex: SC): ").trim().toUpperCase();
+            if (!estado.matches("[A-Z]{2}")) { System.out.println("ERRO: O estado deve ter 2 letras (Ex: SC, SP, RJ)."); continue; }
+            a.setState(estado);
+            break;
+        }
+        
+        // País: obrigatório
+        while (true) {
+            String pais = ler("País: ").trim();
+            if (pais.isEmpty()) { System.out.println("ERRO: O país é obrigatório."); continue; }
+            a.setCountry(pais);
+            break;
+        }
+        
+        return a;
+    }
+
+    /**
+     * Coleta os dados de endereço do console (versão simplificada sem validações rígidas).
+     */
+    public static model.Addresses lerEndereco() {
+        return lerEnderecoValidado();
+    }
+
+    /**
+     * Valida os dígitos verificadores de um CPF.
+     */
+    private static boolean validarCPF(String cpf) {
+        if (cpf.length() != 11) return false;
+        // Rejeita CPFs com todos os dígitos iguais (ex: 11111111111)
+        if (cpf.chars().distinct().count() == 1) return false;
+        
+        // Calcula primeiro dígito verificador
+        int soma = 0;
+        for (int i = 0; i < 9; i++) {
+            soma += (cpf.charAt(i) - '0') * (10 - i);
+        }
+        int d1 = 11 - (soma % 11);
+        if (d1 >= 10) d1 = 0;
+        if (d1 != (cpf.charAt(9) - '0')) return false;
+        
+        // Calcula segundo dígito verificador
+        soma = 0;
+        for (int i = 0; i < 10; i++) {
+            soma += (cpf.charAt(i) - '0') * (11 - i);
+        }
+        int d2 = 11 - (soma % 11);
+        if (d2 >= 10) d2 = 0;
+        return d2 == (cpf.charAt(10) - '0');
+    }
+
+    private void consultar() {
+        String input = ler("\nDigite o ID do usuário para consultar (0 para voltar): ").trim();
+        if (input.equals("0") || input.isEmpty()) return;
+
+        int id;
+        try {
+            id = Integer.parseInt(input);
+        } catch (NumberFormatException e) {
+            System.out.println("Entrada inválida. Digite um número.");
+            return;
+        }
+
+        Users u = userDAO.findById(id);
+        if (u != null) {
+            imprimir(u);
+        } else {
+            System.out.println("Usuário com ID " + id + " não encontrado.");
         }
     }
 
@@ -129,7 +307,7 @@ public class UserView {
         System.out.println("Celular:       " + u.getNrcellphone());
         System.out.println("Nascimento:    " + u.getDtbirth().format(DF_BR));
         System.out.println("ID Endereço:   " + u.getCdaddress());
-        System.out.println("ID Profissão:  " + u.getCdoccupation());
+        System.out.println("Profissão:     " + (u.getOccupation() != null ? u.getOccupation() : "N/A"));
         System.out.println("========================================");
     }
 
@@ -185,13 +363,15 @@ public class UserView {
                 }
             }
             
-            u.setCdaddress(lerIdOuManter("ID Endereço", u.getCdaddress(),
-                    id -> checkAddressExists(id) ? id : null,
-                    this::listAddresses));
-                    
-            u.setCdoccupation(lerIdOuManter("ID Profissão", u.getCdoccupation(),
-                    id -> checkOccupationExists(id) ? id : null,
-                    this::listOccupations));
+            // Atualizar endereço embarcado
+            if (confirmar("Atualizar endereço? (s/n): ")) {
+                model.Addresses endereco = lerEndereco();
+                userDAO.updateAddress(u.getCduser(), endereco);
+            }
+
+            String profAtual = userDAO.getOccupation(u.getCduser());
+            String novaProfissao = lerOuManter("Profissão", profAtual != null ? profAtual : "");
+            userDAO.updateOccupation(u.getCduser(), novaProfissao);
                     
             userDAO.update(u);
             System.out.println("Usuário atualizado com sucesso!");
@@ -242,27 +422,4 @@ public class UserView {
         }
     }
 
-    private boolean checkAddressExists(int id) {
-        AddressDAO addressDAO = new AddressDAO();
-        return addressDAO.findById(id) != null;
-    }
-
-    private void listAddresses() {
-        System.out.println("\n--- ENDEREÇOS DISPONÍVEIS ---");
-        AddressDAO addressDAO = new AddressDAO();
-        List<String> formatted = addressDAO.listAllFormatted();
-        formatted.forEach(System.out::println);
-    }
-
-    private boolean checkOccupationExists(int id) {
-        OccupationDAO occupationDAO = new OccupationDAO();
-        return occupationDAO.findById(id) != null;
-    }
-
-    private void listOccupations() {
-        System.out.println("\n--- PROFISSÕES DISPONÍVEIS ---");
-        OccupationDAO occupationDAO = new OccupationDAO();
-        List<String> occupations = occupationDAO.listAll();
-        occupations.forEach(System.out::println);
-    }
 }

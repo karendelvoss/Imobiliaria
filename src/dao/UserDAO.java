@@ -88,8 +88,8 @@ public class UserDAO {
         u.setDsissuingbody(doc.getString("dsissuingbody"));
         // cdaddress stores the user's own _id (address is embedded in the user document)
         u.setCdaddress(doc.getInteger("_id"));
-        // cdoccupation is no longer a FK; set to 0 as placeholder
-        u.setCdoccupation(0);
+        // Profissão embarcada como texto
+        u.setOccupation(doc.getString("occupation"));
         return u;
     }
 
@@ -192,6 +192,83 @@ public class UserDAO {
     }
 
     /**
+     * Salva um novo usuário com endereço e profissão fornecidos diretamente.
+     *
+     * @param user Objeto contendo os dados do usuário.
+     * @param address Objeto de endereço para embarcar.
+     * @param occupationName Nome da profissão.
+     * @param broker Objeto contendo os dados do corretor ou null.
+     */
+    public void saveUserWithAddress(Users user, Addresses address, String occupationName, Broker_Data broker) {
+        try {
+            int newId = SequenceGenerator.getNextSequence(COLLECTION_NAME);
+            user.setCduser(newId);
+
+            Document doc = toDocument(user, address, occupationName, broker);
+            getCollection().insertOne(doc);
+            System.out.println("Usuário cadastrado com sucesso! ID: " + newId);
+        } catch (MongoWriteException e) {
+            if (e.getMessage() != null && e.getMessage().contains("duplicate key")) {
+                System.err.println("ERRO: Já existe um usuário cadastrado com este documento.");
+            } else {
+                System.err.println("Erro ao salvar usuário: " + e.getMessage());
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao salvar usuário: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Obtém o nome da profissão de um usuário.
+     *
+     * @param userId ID do usuário.
+     * @return Nome da profissão ou null.
+     */
+    public String getOccupation(int userId) {
+        try {
+            Document doc = getCollection().find(Filters.eq("_id", userId)).first();
+            if (doc != null) {
+                return doc.getString("occupation");
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao buscar profissão: " + e.getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Atualiza a profissão de um usuário.
+     *
+     * @param userId ID do usuário.
+     * @param occupationName Novo nome da profissão.
+     */
+    public void updateOccupation(int userId, String occupationName) {
+        try {
+            getCollection().updateOne(
+                    Filters.eq("_id", userId),
+                    Updates.set("occupation", occupationName));
+        } catch (Exception e) {
+            System.err.println("Erro ao atualizar profissão: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Atualiza apenas o endereço embarcado de um usuário.
+     *
+     * @param userId ID do usuário.
+     * @param address Novo endereço.
+     */
+    public void updateAddress(int userId, Addresses address) {
+        try {
+            getCollection().updateOne(
+                    Filters.eq("_id", userId),
+                    Updates.set("address", AddressDAO.toDocument(address)));
+        } catch (Exception e) {
+            System.err.println("Erro ao atualizar endereço: " + e.getMessage());
+        }
+    }
+
+    /**
      * Salva um novo usuário e seus dados de corretor (se houver) em uma inserção atômica.
      * O endereço e a profissão são embarcados no documento do usuário.
      *
@@ -210,15 +287,8 @@ public class UserDAO {
                 address = addressDAO.findById(user.getCdaddress());
             }
 
-            // Buscar nome da profissão para embarcar (se cdoccupation foi definido)
-            String occupationName = null;
-            if (user.getCdoccupation() > 0) {
-                OccupationDAO occupationDAO = new OccupationDAO();
-                model.Occupations occ = occupationDAO.findById(user.getCdoccupation());
-                if (occ != null) {
-                    occupationName = occ.getNmoccupation();
-                }
-            }
+            // Usa a profissão embarcada diretamente do model
+            String occupationName = user.getOccupation();
 
             Document doc = toDocument(user, address, occupationName, broker);
             getCollection().insertOne(doc);
@@ -250,6 +320,30 @@ public class UserDAO {
             }
         } catch (Exception e) {
             e.printStackTrace();
+        }
+        return list;
+    }
+
+    /**
+     * Lista todos os usuários cadastrados como objetos Users.
+     *
+     * @return Lista de objetos Users.
+     */
+    public List<Users> listAllUsers() {
+        List<Users> list = new ArrayList<>();
+        try (MongoCursor<Document> cursor = getCollection()
+                .find()
+                .sort(new Document("_id", 1))
+                .iterator()) {
+            while (cursor.hasNext()) {
+                Document doc = cursor.next();
+                Users u = fromDocument(doc);
+                if (u != null) {
+                    list.add(u);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao listar todos os usuários: " + e.getMessage());
         }
         return list;
     }

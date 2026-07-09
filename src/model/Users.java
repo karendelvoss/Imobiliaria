@@ -13,7 +13,7 @@ public class Users {
     private String nmuser;
     private String nrcellphone;
     private int cdaddress;
-    private int cdoccupation;
+    private String occupation;  // TEXTO embarcado (ex: "Analista de Sistemas")
     private String dsissuingbody;
 
     public int getCduser() {
@@ -72,12 +72,18 @@ public class Users {
         this.cdaddress = cdaddress;
     }
 
-    public int getCdoccupation() {
-        return cdoccupation;
+    /**
+     * Obtém o nome da profissão (texto embarcado).
+     */
+    public String getOccupation() {
+        return occupation;
     }
 
-    public void setCdoccupation(int cdoccupation) {
-        this.cdoccupation = cdoccupation;
+    /**
+     * Define o nome da profissão (texto embarcado).
+     */
+    public void setOccupation(String occupation) {
+        this.occupation = occupation;
     }
 
     public String getDsissuingbody() {
@@ -87,4 +93,5 @@ public class Users {
     public void setDsissuingbody(String dsissuingbody) {
         this.dsissuingbody = dsissuingbody;
     }
+
 }

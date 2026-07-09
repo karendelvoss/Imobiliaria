@@ -5,7 +5,8 @@ package model;
  */
 public enum NotificationChannel {
     EMAIL(1, "E-mail"),
-    WHATSAPP(2, "WhatsApp");
+    WHATSAPP(2, "WhatsApp"),
+    SMS(3, "SMS");
 
     private final int code;
     private final String description;

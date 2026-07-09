@@ -236,7 +236,7 @@ public class AddressEmbeddingPropertyTest {
         user.setNrcellphone(generateRandomAlphanumeric(11));
         user.setDsissuingbody(generateRandomAlphanumeric(5));
         user.setCdaddress(0);
-        user.setCdoccupation(0);
+        user.setOccupation("Teste");
         return user;
     }
 

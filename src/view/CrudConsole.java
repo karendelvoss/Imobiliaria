@@ -60,40 +60,67 @@ public final class CrudConsole {
                                Function<T, String> impressora,
                                SimpleCrud<T> dao
                             ) {
-        System.out.println("\n[" + titulo + "] 1.Novo 2.Listar 3.Atualizar 4.Excluir 0.Voltar");
-        int op = ConsoleIO.lerIntSeguro("Escolha: ");
-        try {
-            switch (op) {
-                case 1: dao.insert(fabricaNovo.get()); break;
-                case 2: dao.listAll().forEach(e -> System.out.println(impressora.apply(e))); break;
-                case 3: {
-                    int id = ConsoleIO.lerInt("ID para atualizar: ");
-                    T alvo = finder.apply(id);
-                    if (alvo == null) { 
-                        System.out.println("ID não encontrado. Opções disponíveis:");
-                        dao.listAll().forEach(e -> System.out.println(impressora.apply(e)));
-                        break; 
+        int op = -1;
+        while (op != 0) {
+            System.out.println("\n[" + titulo + "] 1.Novo 2.Listar 3.Atualizar 4.Excluir 0.Voltar");
+            op = ConsoleIO.lerIntSeguro("Escolha: ");
+            try {
+                switch (op) {
+                    case 1: dao.insert(fabricaNovo.get()); break;
+                    case 2: {
+                        List<T> items = dao.listAll();
+                        if (items.isEmpty()) {
+                            System.out.println("\nNenhum registro cadastrado.");
+                            if (ConsoleIO.confirmar("Deseja cadastrar um novo? (s/n): ")) {
+                                dao.insert(fabricaNovo.get());
+                            }
+                        } else {
+                            items.forEach(e -> System.out.println(impressora.apply(e)));
+                        }
+                        break;
                     }
-                    editor.accept(alvo);
-                    dao.update(alvo);
-                    break;
-                }
-                case 4: {
-                    int id = ConsoleIO.lerInt("ID para excluir: ");
-                    T alvo = finder.apply(id);
-                    if (alvo == null) { 
-                        System.out.println("ID não encontrado. Opções disponíveis:");
-                        dao.listAll().forEach(e -> System.out.println(impressora.apply(e)));
-                        break; 
+                    case 3: {
+                        int id = ConsoleIO.lerInt("ID para atualizar: ");
+                        T alvo = finder.apply(id);
+                        if (alvo == null) { 
+                            System.out.println("ID não encontrado. Opções disponíveis:");
+                            List<T> items = dao.listAll();
+                            if (items.isEmpty()) {
+                                System.out.println("Nenhum registro cadastrado.");
+                            } else {
+                                items.forEach(e -> System.out.println(impressora.apply(e)));
+                            }
+                            break; 
+                        }
+                        editor.accept(alvo);
+                        dao.update(alvo);
+                        break;
                     }
-                    dao.delete(id);
-                    break;
+                    case 4: {
+                        int id = ConsoleIO.lerInt("ID para excluir: ");
+                        T alvo = finder.apply(id);
+                        if (alvo == null) { 
+                            System.out.println("ID não encontrado. Opções disponíveis:");
+                            List<T> items = dao.listAll();
+                            if (items.isEmpty()) {
+                                System.out.println("Nenhum registro cadastrado.");
+                            } else {
+                                items.forEach(e -> System.out.println(impressora.apply(e)));
+                            }
+                            break; 
+                        }
+                        if (ConsoleIO.confirmar("Confirmar exclusão? (s/n): ")) {
+                            dao.delete(id);
+                            System.out.println("Registro excluído!");
+                        }
+                        break;
+                    }
+                    case 0: break;
+                    default: System.out.println("Opção inválida.");
                 }
-                case 0: break;
-                default: System.out.println("Opção inválida.");
+            } catch (Exception e) {
+                System.out.println("Operação cancelada: " + e.getMessage());
             }
-        } catch (Exception e) {
-            System.out.println("Operação cancelada: " + e.getMessage());
         }
     }
 }

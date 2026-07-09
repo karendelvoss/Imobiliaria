@@ -1,384 +1,205 @@
 # Sistema Imobiliário
 
-Sistema de gestão imobiliária desenvolvido em Java com banco de dados MongoDB.
+Sistema de gestão imobiliária desenvolvido em Java com banco de dados MongoDB Atlas (NoSQL nativo).
 
 ## Requisitos
 
-- **Java JDK 17+**
-- **MongoDB 7.x** (via Docker ou instalação local)
-- **mongosh** (MongoDB Shell) — para executar o script de inicialização
-- Drivers já incluídos em `dist/lib/` (MongoDB Driver Sync 5.1.0 e iText)
+- **Java JDK 11+**
+- **mongosh** (MongoDB Shell) — para executar o script de seed
+- Drivers já incluídos em `dist/lib/` (MongoDB Driver Sync 5.1.0, iText PDF, SLF4J, dnsjava)
 
 ---
 
-## 1. Instalação do MongoDB
+## 1. Conexão com MongoDB Atlas
 
-Escolha **uma** das opções abaixo.
+O sistema conecta diretamente ao **MongoDB Atlas** (cloud). A connection string está em `src/dao/Conexao.java`:
 
-### Opção A — MongoDB via Docker (recomendado)
-
-#### A.1. Criar o container com Replica Set
-
-O sistema utiliza transações multi-documento, que requerem um replica set configurado.
-
-```bash
-docker run -d \
-  --name mongo-imobiliaria \
-  -p 27017:27017 \
-  mongo:7 --replSet rs0
+```java
+private static final String CONNECTION_STRING =
+    "mongodb+srv://delvossribas:AemBsxTH1hEuFrHT@imobiliaria.f7x4ou9.mongodb.net/?appName=imobiliaria";
 ```
 
-No Windows (cmd), use uma única linha (sem `\`):
+Não é necessário instalar MongoDB localmente. O Atlas já está configurado e acessível.
 
-```bat
-docker run -d --name mongo-imobiliaria -p 27017:27017 mongo:7 --replSet rs0
-```
+### Dependência: dnsjava
 
-#### A.2. Inicializar o Replica Set
-
-```bash
-docker exec mongo-imobiliaria mongosh --eval "rs.initiate()"
-```
-
-Aguarde alguns segundos até o replica set estar pronto. Você pode verificar o status com:
-
-```bash
-docker exec mongo-imobiliaria mongosh --eval "rs.status()"
-```
-
-#### A.3. Comandos úteis
-
-```bash
-docker logs -f mongo-imobiliaria               # ver logs
-docker stop mongo-imobiliaria                   # parar
-docker start mongo-imobiliaria                  # iniciar de novo
-docker exec -it mongo-imobiliaria mongosh       # abrir mongosh interativo
-docker rm -f mongo-imobiliaria                  # remover container (dados perdidos)
-```
+O protocolo `mongodb+srv://` utiliza resolução DNS SRV. A biblioteca `dnsjava-3.5.3.jar` (inclusa em `dist/lib/`) é obrigatória para isso funcionar.
 
 ---
 
-### Opção B — MongoDB instalação local (Linux/macOS)
+## 2. Instalação do mongosh (para seed dos dados)
 
-#### B.1. Instalar o MongoDB 7.x
+O `mongosh` é necessário apenas para executar o script de inicialização dos dados. Se já tiver instalado, pule esta etapa.
 
-**Ubuntu/Debian:**
-
-```bash
-# Importar chave GPG
-curl -fsSL https://www.mongodb.org/static/pgp/server-7.0.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-
-# Adicionar repositório
-echo "deb [ signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] https://repo.mongodb.org/apt/ubuntu $(lsb_release -cs)/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-
-# Instalar
-sudo apt-get update
-sudo apt-get install -y mongodb-org
-```
-
-**macOS (Homebrew):**
+### Linux (Ubuntu/WSL)
 
 ```bash
-brew tap mongodb/brew
-brew install mongodb-community@7.0
+wget -qO- https://downloads.mongodb.com/compass/mongosh-2.2.1-linux-x64.tgz | tar xz
+sudo cp mongosh-2.2.1-linux-x64/bin/* /usr/local/bin/
+mongosh --version
 ```
 
-#### B.2. Iniciar com Replica Set
-
-O MongoDB deve ser iniciado com suporte a replica set para que transações funcionem:
+### macOS
 
 ```bash
-mongod --replSet rs0 --dbpath /var/lib/mongodb --port 27017
+brew install mongosh
 ```
 
-Em outro terminal, inicialize o replica set:
+### Windows
 
-```bash
-mongosh --eval "rs.initiate()"
-```
-
-> **Nota:** Para iniciar automaticamente com replica set, adicione `replSetName: rs0` ao arquivo de configuração `/etc/mongod.conf` na seção `replication`.
+Baixe o instalador em: https://www.mongodb.com/try/download/shell
 
 ---
 
-## 2. Inicialização do Banco de Dados
+## 3. Inicialização dos Dados (Seed)
 
-Após o MongoDB estar rodando com replica set configurado, execute o script de inicialização:
-
-```bash
-mongosh database/init-mongo.js
-```
-
-Ou, se estiver usando Docker:
+Execute o script que cria todas as coleções, índices e dados de exemplo no Atlas:
 
 ```bash
-docker exec -i mongo-imobiliaria mongosh < database/init-mongo.js
+cd /root/code/faculdade/Imobiliaria
+mongosh "mongodb+srv://delvossribas:AemBsxTH1hEuFrHT@imobiliaria.f7x4ou9.mongodb.net/imobiliaria" database/init-mongo-atlas.js
 ```
 
 O script realiza:
-- Verificação se o banco `imobiliaria` já existe (evita perda de dados acidental)
-- Criação de todas as coleções necessárias
-- Criação dos índices (incluindo índices únicos)
-- Inicialização dos contadores de IDs sequenciais
-- Inserção dos dados de exemplo
+1. Drop do banco existente (recria do zero)
+2. Criação de 8 coleções + índices
+3. Inicialização dos contadores de IDs sequenciais
+4. Inserção de 18 usuários, 1 imóvel, 12 contratos, 1 template, 2 índices, notificações e logs
 
-> **Atenção:** Se o banco já existir, o script aborta com um aviso. Para recriar do zero, primeiro remova o banco manualmente: `mongosh --eval "use imobiliaria; db.dropDatabase()"`
+> **ATENÇÃO:** O script apaga todos os dados existentes antes de recriar. Use com cuidado.
 
 ---
 
-## 3. Compilação e Execução
+## 4. Compilação e Execução
 
-### Linux / macOS / WSL
+### Compilar
 
 ```bash
-javac -d bin -cp "dist/lib/*" $(find src -name "*.java")
+cd /root/code/faculdade/Imobiliaria
+find src -name "*.java" -not -path "*/test/*" > /tmp/sources.txt
+javac -d bin -cp "dist/lib/*" -sourcepath src @/tmp/sources.txt
+```
+
+### Executar
+
+```bash
 java -cp "bin:dist/lib/*" view.Main
 ```
 
-> No Linux/macOS o separador do classpath é `:`.
+> No Windows, troque `:` por `;` no classpath: `java -cp "bin;dist/lib/*" view.Main`
 
-### Windows (cmd / PowerShell)
-
-```bat
-javac -encoding UTF-8 -d bin -cp "dist/lib/*" src/model/*.java src/dao/*.java src/view/*.java src/dto/*.java src/service/*.java
-java -cp "bin;dist/lib/*" view.Main
-```
-
-> No Windows o separador do classpath é `;`.
-
-### Configuração da conexão
-
-A conexão com o MongoDB é configurada em `src/dao/Conexao.java`:
-
-```java
-private static final String HOST = "localhost";
-private static final int PORT = 27017;
-private static final String DATABASE = "imobiliaria";
-```
-
-Por padrão, conecta ao MongoDB na porta `27017` sem autenticação (ambiente de desenvolvimento).
-
----
-
-## 4. Configuração de Replica Set (Transações)
-
-O sistema utiliza transações multi-documento do MongoDB para garantir consistência em operações que envolvem múltiplas coleções (ex.: registro de contrato + atualização de status do imóvel). Transações requerem um **replica set** configurado.
-
-### Por que Replica Set?
-
-- Transações multi-documento só funcionam com replica set ou sharded cluster
-- Mesmo em ambiente de desenvolvimento com um único nó, é necessário configurar como single-node replica set
-- Operações dentro de um mesmo documento (parcelas dentro do contrato, por exemplo) são atômicas por natureza e não precisam de transação
-
-### Verificar se o Replica Set está ativo
+### Comando único (compilar + rodar)
 
 ```bash
-mongosh --eval "rs.status().ok"
+cd /root/code/faculdade/Imobiliaria
+find src -name "*.java" -not -path "*/test/*" > /tmp/sources.txt && javac -d bin -cp "dist/lib/*" -sourcepath src @/tmp/sources.txt && java -cp "bin:dist/lib/*" view.Main
 ```
-
-Se retornar `1`, o replica set está funcional.
 
 ---
 
-## 5. Estrutura das Coleções (Modelo de Dados)
+## 5. Estrutura do Projeto
 
-O sistema utiliza um modelo orientado a documentos com embedding estratégico para reduzir joins:
+```
+Imobiliaria/
+├── src/
+│   ├── model/          # Entidades (Users, Properties, Contracts, etc.)
+│   ├── dao/            # Acesso a dados MongoDB (Conexao, UserDAO, ContractDAO, etc.)
+│   ├── service/        # Lógica de negócio (FinancialService, NotificationService, etc.)
+│   ├── view/           # Interface console (Main, UserView, ContractView, ReportView)
+│   ├── dto/            # Data Transfer Objects (relatórios)
+│   └── test/           # Testes (property-based testing)
+├── dist/lib/           # JARs de dependência (MongoDB Driver, iText, SLF4J, dnsjava)
+├── database/
+│   ├── init-mongo-atlas.js   # Script de seed para MongoDB Atlas
+│   └── insert.sql            # Dados originais em SQL (referência)
+├── pdfs/               # PDFs gerados pelo sistema
+├── bin/                # Classes compiladas (.class)
+└── README.md
+```
 
-### Coleções Principais
+---
 
-| Coleção | Descrição | Estratégia |
-|---------|-----------|------------|
-| `users` | Usuários (proprietários, locatários, corretores) | Endereço e profissão embarcados |
+## 6. Modelo de Dados (NoSQL Nativo)
+
+O sistema utiliza uma abordagem NoSQL-nativa com **embedding estratégico**:
+
+### Coleções
+
+| Coleção | Descrição | Embedding |
+|---------|-----------|-----------|
+| `users` | Usuários | Endereço + profissão + contas bancárias embarcados |
 | `properties` | Imóveis | Endereço embarcado; tipo/finalidade/status como texto |
-| `contracts` | Contratos de locação/venda | Parcelas e participantes embarcados |
-| `notifications` | Notificações do sistema | Coleção independente com referências |
-| `contract_templates` | Modelos de contrato | Tópicos e cláusulas embarcados |
-| `indexes` | Índices financeiros (IPCA, IGP-M) | Taxas embarcadas como array |
+| `contracts` | Contratos | Participantes + parcelas embarcados |
+| `notifications` | Notificações | Coleção independente |
+| `contract_templates` | Modelos | Tópicos + cláusulas embarcados |
+| `indexes` | Índices financeiros | Taxas embarcadas como array |
 | `readjustment_logs` | Logs de reajuste | Coleção independente |
-| `counters` | Contadores de IDs sequenciais | Auxiliar para geração de IDs |
+| `counters` | Contadores de IDs | Auxiliar |
 
-### Estrutura dos Documentos
+### Diferenças do modelo relacional
 
-#### `users`
-```json
-{
-  "_id": 1,
-  "nmuser": "João Silva",
-  "dtbirth": "1990-05-20",
-  "fgdocument": true,
-  "document": "12345678900",
-  "nrcellphone": "47999999999",
-  "dsissuingbody": "SSP",
-  "address": {
-    "cdzipcode": "89200000",
-    "nmstreet": "Rua XV de Novembro",
-    "nraddress": "1000",
-    "dscomplement": "Sala 2",
-    "district": "Centro",
-    "city": "Joinville",
-    "state": "SC",
-    "country": "Brasil"
-  },
-  "occupation": "Analista de Sistemas",
-  "bank_accounts": [
-    { "nragency": "0001", "nraccount": "12345-6", "nrpixkey": "joao@email.com" }
-  ]
-}
-```
-
-#### `properties`
-```json
-{
-  "_id": 1,
-  "nrregistration": "MAT-99887",
-  "dsdescription": "Apto com 2 quartos no centro",
-  "vltotalarea": 65.50,
-  "address": {
-    "cdzipcode": "89200000",
-    "nmstreet": "Rua XV de Novembro",
-    "nraddress": "1000",
-    "district": "Centro",
-    "city": "Joinville",
-    "state": "SC",
-    "country": "Brasil"
-  },
-  "type": "Apartamento",
-  "purpose": "Residencial",
-  "status": "Alugado",
-  "owners": [1]
-}
-```
-
-#### `contracts`
-```json
-{
-  "_id": 9,
-  "dtcreation": "2025-04-25",
-  "dstitle": "Contrato Locação",
-  "cdtemplate": 1,
-  "cdproperty": 1,
-  "cdindex": 1,
-  "dtlimit": "2026-04-25",
-  "cdstatus": 1,
-  "notary": null,
-  "participants": [
-    { "cduser": 1, "cdrole": 2, "nmrole": "Locador" },
-    { "cduser": 2, "cdrole": 1, "nmrole": "Locatário" }
-  ],
-  "installments": [
-    {
-      "cdinstallment": 31,
-      "nrinstallment": 1,
-      "dtdue": "2025-05-01",
-      "vlbase": 1200.00,
-      "vladjusted": 0.00,
-      "cdstatus": 2,
-      "dtpayment": "2026-04-25",
-      "vlpenalty": 10.00,
-      "vlinterest": 1.00
-    }
-  ]
-}
-```
-
-#### `contract_templates`
-```json
-{
-  "_id": 1,
-  "nmtemplate": "Contrato de Locação Padrão",
-  "dsversion": "1.0",
-  "fgactive": true,
-  "topics": [
-    {
-      "cdtopic": 1,
-      "nmtopic": "Do Objeto da Locação",
-      "nrorder": 1,
-      "clauses": [
-        { "cdclause": 1, "dstext": "O locador cede ao locatário...", "nrorder": 1 }
-      ]
-    }
-  ]
-}
-```
-
-#### `indexes`
-```json
-{
-  "_id": 1,
-  "nmindex": "IPCA",
-  "rates": [
-    { "refmonth": 4, "refyear": 2024, "vlrate": 0.0038 },
-    { "refmonth": 5, "refyear": 2024, "vlrate": 0.0046 }
-  ]
-}
-```
-
-### Mapeamento PostgreSQL → MongoDB
-
-| Tabelas PostgreSQL originais | Destino no MongoDB |
-|------------------------------|-------------------|
-| countries, states, cities, districts | Embarcados em `address` |
-| addresses | Embarcado em `users` e `properties` |
-| occupations | Campo texto `users.occupation` |
-| users | Coleção `users` |
-| bank_accounts | Array em `users.bank_accounts` |
-| properties, property_types, property_purposes, property_status | Coleção `properties` (tipos como texto) |
-| properties_users | Array `properties.owners` |
-| contracts | Coleção `contracts` |
-| user_contract + roles | Array `contracts.participants` |
-| installments | Array `contracts.installments` |
-| notaries | Subdocumento `contracts.notary` |
-| notifications | Coleção `notifications` |
-| contract_templates + topics + clauses | Coleção `contract_templates` (tudo embarcado) |
-| indexes + index_rates | Coleção `indexes` (rates embarcado) |
+| Conceito Relacional | Abordagem MongoDB |
+|---------------------|-------------------|
+| Tabelas de lookup (tipos, status, profissões) | Texto embarcado diretamente |
+| JOIN users + addresses | Endereço como subdocumento em users |
+| JOIN contracts + installments + user_contract | Arrays embarcados no contrato |
+| JOIN indexes + index_rates | Array `rates` dentro do index |
+| FK para countries/states/cities/districts | Campos texto no address (city, state, country) |
 
 ---
 
-## 6. Executar Testes
+## 7. Funcionalidades
 
-Os testes utilizam o framework [jqwik](https://jqwik.net/) para property-based testing e JUnit 5 para testes unitários.
+### Módulo 1 — Cadastros (CRUD)
+- Usuários (com validação de CPF, celular, endereço)
+- Imóveis (tipo/finalidade/status como texto, endereço embarcado)
+- Modelos de Contrato (templates, tópicos, cláusulas)
+- Índices Financeiros (IPCA + taxas mensais)
+- Contas Bancárias
 
-### Compilar testes
+### Módulo 2 — Processos de Negócio
+- Efetivar novo contrato (fluxo completo com geração de PDF)
+- Vincular/desvincular proprietário a imóvel
+- Alterar/excluir contrato
+- Estruturar modelo de contrato
+- Processar reajustes mensais (Job automático)
+- Processar notificações (4 tipos: lembrete, pagamento, reajuste, vencimento)
+- Registrar pagamento de parcela (com cálculo de multa/juros)
 
-```bash
-javac -d bin -cp "dist/lib/*:dist/lib/test/*" $(find src -name "*.java")
-```
-
-### Executar testes
-
-```bash
-java -cp "bin:dist/lib/*:dist/lib/test/*" org.junit.platform.console.ConsoleLauncher --scan-classpath
-```
-
-> **Nota:** Os testes requerem uma instância MongoDB rodando localmente com replica set configurado.
+### Módulo 3 — Relatórios
+1. Relatório Financeiro de Locação
+2. Relatório Financeiro de Venda (correção monetária)
+3. Relatório de Partes do Contrato
+4. Relatório de Reajustes do Ano
+5. Listagem Geral de Imóveis (com filtro por bairro)
+6. Fluxo de Caixa Mensal e Adimplência (aggregation pipeline)
 
 ---
 
-## 7. Visualizar PDFs gerados (dentro do VS Code)
+## 8. Geração de PDF
 
-O sistema gera PDFs em `pdfs/` (ex.: `pdfs/contrato_preenchido_20.pdf`). Para visualizá-los **dentro do VS Code**, instale a extensão:
-
-- **vscode-pdf** (autor: *tomoki1207*)
-  ```bash
-  code --install-extension tomoki1207.pdf
-  ```
-
-Alternativas fora do VS Code:
+O sistema gera PDFs de contratos preenchidos automaticamente em `pdfs/`. Para visualizar:
 
 ```bash
 xdg-open pdfs/contrato_preenchido_20.pdf      # Linux
-explorer.exe pdfs\contrato_preenchido_20.pdf  # Windows / WSL
+explorer.exe pdfs\contrato_preenchido_20.pdf  # Windows/WSL
 open pdfs/contrato_preenchido_20.pdf          # macOS
 ```
 
 ---
 
-## 8. Introdução explicativa do domínio de informação escolhido
+## 9. Transações Multi-Documento
 
-O domínio escolhido abrange a gestão operacional e financeira de uma imobiliária.
-O sistema visa centralizar o controle de imóveis (cadastros técnicos, metragens e localização), 
-clientes (proprietários e locatários) e a formalização de negócios através de contratos de locação ou venda.
-A solução proposta resolve a fragmentação de dados ao vincular automaticamente a situação financeira (parcelas/comissões) 
-ao status do imóvel e às partes envolvidas, permitindo o rastreamento de índices de reajuste, 
-notificações de eventos e a gestão de múltiplos proprietários por unidade, 
-garantindo integridade referencial em todo o ciclo de vida do ativo imobiliário.
+O sistema utiliza transações MongoDB para operações atômicas:
+- Registro completo de contrato (contrato + atualização de status do imóvel)
+- Exclusão de contrato (contrato + notificações vinculadas)
+
+> **Nota:** MongoDB Atlas já suporta transações nativamente (replica set configurado na cloud).
+
+---
+
+## 10. Sobre o Domínio
+
+O domínio abrange a gestão operacional e financeira de uma imobiliária. O sistema centraliza o controle de imóveis (cadastros técnicos, metragens e localização), clientes (proprietários e locatários) e a formalização de negócios através de contratos de locação ou venda.
+
+A solução resolve a fragmentação de dados ao vincular automaticamente a situação financeira (parcelas) ao status do imóvel e às partes envolvidas, permitindo rastreamento de índices de reajuste, notificações automáticas de eventos e gestão de múltiplos proprietários por unidade.

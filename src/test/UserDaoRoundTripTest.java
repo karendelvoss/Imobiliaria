@@ -163,7 +163,7 @@ public class UserDaoRoundTripTest {
         user.setDtbirth(generateRandomDate());
         user.setDsissuingbody(generateRandomIssuingBody());
         user.setCdaddress(0);
-        user.setCdoccupation(0);
+        user.setOccupation("Teste");
         return user;
     }
 

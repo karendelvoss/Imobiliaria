@@ -59,10 +59,17 @@ public class IndexRateDAO {
      */
     private Index_Rates fromDocument(Document doc, int cdindex) {
         Index_Rates rate = new Index_Rates();
-        rate.setCdrate(doc.getInteger("cdrate"));
-        rate.setRefmonth(doc.getInteger("refmonth"));
-        rate.setRefyear(doc.getInteger("refyear"));
-        rate.setVlrate(doc.getDouble("vlrate"));
+        rate.setCdrate(doc.getInteger("cdrate") != null ? doc.getInteger("cdrate") : 0);
+        rate.setRefmonth(doc.getInteger("refmonth", 0));
+        rate.setRefyear(doc.getInteger("refyear", 0));
+        Object vlrateObj = doc.get("vlrate");
+        if (vlrateObj instanceof Double) {
+            rate.setVlrate((Double) vlrateObj);
+        } else if (vlrateObj instanceof Integer) {
+            rate.setVlrate(((Integer) vlrateObj).doubleValue());
+        } else {
+            rate.setVlrate(0.0);
+        }
         rate.setFk_Indexes_cdindex(cdindex);
         return rate;
     }

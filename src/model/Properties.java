@@ -2,6 +2,7 @@ package model;
 
 /**
  * Representa a entidade de Imóveis (Properties).
+ * Os campos cdtype, cdpurpose e cdstatus são TEXTO (embarcado no MongoDB).
  */
 public class Properties {
     private int cdproperty;
@@ -9,9 +10,9 @@ public class Properties {
     private String dsdescription;
     private double vltotalarea;
     private int cdaddress;
-    private int cdtype;
-    private int cdpurpose;
-    private int cdstatus;
+    private String cdtype;      // TEXTO - embarcado (ex: "Apartamento", "Casa")
+    private String cdpurpose;   // TEXTO - embarcado (ex: "Residencial", "Comercial")
+    private String cdstatus;    // TEXTO - embarcado (ex: "Alugado", "Disponível")
 
     public int getCdproperty() {
         return cdproperty;
@@ -53,27 +54,27 @@ public class Properties {
         this.cdaddress = cdaddress;
     }
 
-    public int getCdtype() {
+    public String getCdtype() {
         return cdtype;
     }
 
-    public void setCdtype(int cdtype) {
+    public void setCdtype(String cdtype) {
         this.cdtype = cdtype;
     }
 
-    public int getCdpurpose() {
+    public String getCdpurpose() {
         return cdpurpose;
     }
 
-    public void setCdpurpose(int cdpurpose) {
+    public void setCdpurpose(String cdpurpose) {
         this.cdpurpose = cdpurpose;
     }
 
-    public int getCdstatus() {
+    public String getCdstatus() {
         return cdstatus;
     }
 
-    public void setCdstatus(int cdstatus) {
+    public void setCdstatus(String cdstatus) {
         this.cdstatus = cdstatus;
     }
 }

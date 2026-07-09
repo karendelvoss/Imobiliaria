@@ -148,9 +148,9 @@ public class IntegrationTest {
             prop.setNrregistration("INTTEST-A-" + System.nanoTime());
             prop.setDsdescription("Imóvel para teste de integração A");
             prop.setVltotalarea(100.0);
-            prop.setCdtype(1);   // Casa
-            prop.setCdpurpose(1); // Residencial
-            prop.setCdstatus(2); // Disponível
+            prop.setCdtype("Casa");
+            prop.setCdpurpose("Residencial");
+            prop.setCdstatus("Disponível");
 
             int propId = propertyDAO.insertProperty(prop);
             if (propId <= 0) {
